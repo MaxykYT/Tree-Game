@@ -15,7 +15,6 @@
         @touchstart="start"
         @touchend="stop"
         @touchcancel="stop"
-        :disabled="!unref(canClick)"
     >
         <div v-if="title"><component :is="titleComponent" /></div>
         <component :is="component" style="white-space: pre-line" />
@@ -24,15 +23,15 @@
 </template>
 
 <script lang="ts">
-import "@/components/common/features.css";
-import LinkNode from "@/components/links/LinkNode.vue";
-import { CoercableComponent, StyleValue, Visibility } from "@/features/feature";
+import "components/common/features.css";
+import LinkNode from "components/links/LinkNode.vue";
+import { CoercableComponent, StyleValue, Visibility } from "features/feature";
 import {
     computeComponent,
     computeOptionalComponent,
     processedPropType,
     setupHoldToClick
-} from "@/util/vue";
+} from "util/vue";
 import { defineComponent, PropType, toRefs, unref } from "vue";
 
 export default defineComponent({

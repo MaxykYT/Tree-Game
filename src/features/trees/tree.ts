@@ -7,15 +7,15 @@ import {
     setDefault,
     StyleValue,
     Visibility
-} from "@/features/feature";
-import { Link } from "@/features/links";
-import { GenericReset } from "@/features/reset";
-import { displayResource, Resource } from "@/features/resources/resource";
-import { Tooltip } from "@/features/tooltip";
-import TreeComponent from "@/features/trees/Tree.vue";
-import { persistent } from "@/game/persistence";
-import { DecimalSource, format } from "@/util/bignum";
-import Decimal, { formatWhole } from "@/util/break_eternity";
+} from "features/feature";
+import { Link } from "features/links";
+import { GenericReset } from "features/reset";
+import { displayResource, Resource } from "features/resources/resource";
+import { Tooltip } from "features/tooltip";
+import TreeComponent from "features/trees/Tree.vue";
+import { persistent } from "game/persistence";
+import { DecimalSource, format } from "util/bignum";
+import Decimal, { formatWhole } from "util/break_eternity";
 import {
     Computable,
     convertComputable,
@@ -23,8 +23,8 @@ import {
     GetComputableTypeWithDefault,
     processComputable,
     ProcessedComputable
-} from "@/util/computed";
-import { createLazyProxy } from "@/util/proxies";
+} from "util/computed";
+import { createLazyProxy } from "util/proxies";
 import { computed, ref, Ref, unref } from "vue";
 
 export const TreeNodeType = Symbol("TreeNode");
@@ -100,6 +100,23 @@ export function createTreeNode<T extends TreeNodeOptions>(
         processComputable(treeNode as T, "classes");
         processComputable(treeNode as T, "style");
         processComputable(treeNode as T, "mark");
+
+        if (treeNode.onClick) {
+            const onClick = treeNode.onClick;
+            treeNode.onClick = function () {
+                if (unref(treeNode.canClick)) {
+                    onClick();
+                }
+            };
+        }
+        if (treeNode.onHold) {
+            const onHold = treeNode.onHold;
+            treeNode.onHold = function () {
+                if (unref(treeNode.canClick)) {
+                    onHold();
+                }
+            };
+        }
 
         return treeNode as unknown as TreeNode<T>;
     });

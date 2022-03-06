@@ -1,19 +1,19 @@
-import Decimal, { DecimalSource, format, formatWhole } from "@/util/bignum";
+import Decimal, { DecimalSource, format, formatWhole } from "util/bignum";
 import { computed, ComputedRef, ref, Ref, watch } from "vue";
-import { globalBus } from "@/game/events";
-import { State, persistent } from "@/game/persistence";
+import { globalBus } from "game/events";
+import { State, persistent } from "game/persistence";
 
 export interface Resource<T = DecimalSource> extends Ref<T> {
     displayName: string;
     precision: number;
-    small: boolean;
+    small?: boolean;
 }
 
 export function createResource<T extends State>(
     defaultValue: T | Ref<T>,
     displayName = "points",
     precision = 0,
-    small = false
+    small = undefined
 ): Resource<T> {
     const resource: Partial<Resource<T>> = persistent(defaultValue);
     resource.displayName = displayName;

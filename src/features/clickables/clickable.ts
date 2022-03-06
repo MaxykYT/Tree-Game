@@ -1,4 +1,4 @@
-import ClickableComponent from "@/features/clickables/Clickable.vue";
+import ClickableComponent from "features/clickables/Clickable.vue";
 import {
     CoercableComponent,
     Component,
@@ -8,15 +8,16 @@ import {
     setDefault,
     StyleValue,
     Visibility
-} from "@/features/feature";
+} from "features/feature";
 import {
     Computable,
     GetComputableType,
     GetComputableTypeWithDefault,
     processComputable,
     ProcessedComputable
-} from "@/util/computed";
-import { createLazyProxy } from "@/util/proxies";
+} from "util/computed";
+import { createLazyProxy } from "util/proxies";
+import { unref } from "vue";
 
 export const ClickableType = Symbol("Clickable");
 
@@ -82,6 +83,23 @@ export function createClickable<T extends ClickableOptions>(
         processComputable(clickable as T, "style");
         processComputable(clickable as T, "mark");
         processComputable(clickable as T, "display");
+
+        if (clickable.onClick) {
+            const onClick = clickable.onClick;
+            clickable.onClick = function () {
+                if (unref(clickable.canClick)) {
+                    onClick();
+                }
+            };
+        }
+        if (clickable.onHold) {
+            const onHold = clickable.onHold;
+            clickable.onHold = function () {
+                if (unref(clickable.canClick)) {
+                    onHold();
+                }
+            };
+        }
 
         clickable[GatherProps] = function (this: GenericClickable) {
             const {

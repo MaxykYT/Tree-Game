@@ -1,16 +1,16 @@
-import { createLayerTreeNode, createResetButton } from "@/data/common";
-import { main } from "@/data/mod";
-import { createClickable } from "@/features/clickables/clickable";
-import { createExponentialScaling, createIndependentConversion } from "@/features/conversion";
-import { jsx } from "@/features/feature";
-import { createInfobox } from "@/features/infoboxes/infobox";
-import { createReset } from "@/features/reset";
-import MainDisplay from "@/features/resources/MainDisplay.vue";
-import { createResource, displayResource } from "@/features/resources/resource";
-import { createLayer } from "@/game/layers";
-import { persistent } from "@/game/persistence";
-import Decimal, { DecimalSource, formatWhole } from "@/util/bignum";
-import { render } from "@/util/vue";
+import { createLayerTreeNode, createResetButton } from "data/common";
+import { main } from "data/projEntry";
+import { createClickable } from "features/clickables/clickable";
+import { createPolynomialScaling, createIndependentConversion } from "features/conversion";
+import { jsx } from "features/feature";
+import { createInfobox } from "features/infoboxes/infobox";
+import { createReset } from "features/reset";
+import MainDisplay from "features/resources/MainDisplay.vue";
+import { createResource, displayResource } from "features/resources/resource";
+import { createLayer } from "game/layers";
+import { persistent } from "game/persistence";
+import Decimal, { DecimalSource, formatWhole } from "util/bignum";
+import { render } from "util/vue";
 import c from "./c";
 
 const layer = createLayer(() => {
@@ -94,7 +94,7 @@ const layer = createLayer(() => {
     }));
 
     const conversion = createIndependentConversion(() => ({
-        scaling: createExponentialScaling(10, 3, 0.5),
+        scaling: createPolynomialScaling(10, 0.5),
         baseResource: main.points,
         gainResource: points,
         modifyGainAmount: gain => Decimal.times(gain, c.otherThingy.value)

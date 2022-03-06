@@ -29,7 +29,6 @@
                 },
                 unref(style) ?? []
             ]"
-            :disabled="!unref(canClick)"
         >
             <component :is="unref(comp)" />
         </button>
@@ -39,19 +38,19 @@
 </template>
 
 <script lang="ts">
-import LinkNode from "@/components/links/LinkNode.vue";
-import MarkNode from "@/components/MarkNode.vue";
-import TooltipVue from "@/components/Tooltip.vue";
-import { CoercableComponent, StyleValue, Visibility } from "@/features/feature";
-import { gatherTooltipProps, Tooltip } from "@/features/tooltip";
-import { ProcessedComputable } from "@/util/computed";
+import LinkNode from "components/links/LinkNode.vue";
+import MarkNode from "components/MarkNode.vue";
+import TooltipVue from "components/Tooltip.vue";
+import { CoercableComponent, StyleValue, Visibility } from "features/feature";
+import { gatherTooltipProps, Tooltip } from "features/tooltip";
+import { ProcessedComputable } from "util/computed";
 import {
     computeOptionalComponent,
     isCoercableComponent,
     processedPropType,
     setupHoldToClick,
     unwrapRef
-} from "@/util/vue";
+} from "util/vue";
 import {
     computed,
     defineComponent,

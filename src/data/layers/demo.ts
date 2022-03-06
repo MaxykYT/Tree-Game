@@ -1,12 +1,12 @@
 /* eslint-disable */
-import { layers } from "@/game/layers";
-import player from "@/game/player";
-import { RawLayer } from "@/typings/layer";
-import Decimal, { format } from "@/util/bignum";
+import { layers } from "game/layers";
+import player from "game/player";
+import { RawLayer } from "typings/layer";
+import Decimal, { format } from "util/bignum";
 import {
   getBuyableAmount, hasChallenge, hasMilestone, hasUpgrade, setBuyableAmount
-} from "@/util/features";
-import { resetLayer } from "@/util/layers";
+} from "util/features";
+import { resetLayer } from "util/layers";
 
 export default {
   id: "p",

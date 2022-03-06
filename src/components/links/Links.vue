@@ -18,7 +18,7 @@ import {
     LinkNode,
     RegisterLinkNodeInjectionKey,
     UnregisterLinkNodeInjectionKey
-} from "@/features/links";
+} from "features/links";
 import { computed, nextTick, onMounted, provide, ref, toRef } from "vue";
 import LinkVue from "./Link.vue";
 
@@ -80,7 +80,7 @@ function updateNodes() {
         nextTick(() => {
             boundingRect = resizeListener.value?.getBoundingClientRect();
             Object.keys(nodes.value).forEach(id => updateNode(id));
-            isDirty = true
+            isDirty = true;
         });
     }
 }

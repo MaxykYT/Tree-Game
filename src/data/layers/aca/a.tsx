@@ -1,15 +1,15 @@
-import Row from "@/components/layout/Row.vue";
-import Tooltip from "@/components/Tooltip.vue";
-import { main } from "@/data/mod";
-import { createAchievement } from "@/features/achievements/achievement";
-import { jsx } from "@/features/feature";
-import { createGrid } from "@/features/grids/grid";
-import { createResource } from "@/features/resources/resource";
-import { createTreeNode } from "@/features/trees/tree";
-import { createLayer } from "@/game/layers";
-import { DecimalSource } from "@/lib/break_eternity";
-import Decimal from "@/util/bignum";
-import { render, renderRow } from "@/util/vue";
+import Row from "components/layout/Row.vue";
+import Tooltip from "components/Tooltip.vue";
+import { main } from "data/projEntry";
+import { createAchievement } from "features/achievements/achievement";
+import { jsx } from "features/feature";
+import { createGrid } from "features/grids/grid";
+import { createResource } from "features/resources/resource";
+import { createTreeNode } from "features/trees/tree";
+import { createLayer } from "game/layers";
+import { DecimalSource } from "lib/break_eternity";
+import Decimal from "util/bignum";
+import { render, renderRow } from "util/vue";
 import { computed } from "vue";
 import f from "./f";
 

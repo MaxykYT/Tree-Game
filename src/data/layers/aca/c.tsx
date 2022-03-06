@@ -1,42 +1,42 @@
-import Slider from "@/components/fields/Slider.vue";
-import Text from "@/components/fields/Text.vue";
-import Toggle from "@/components/fields/Toggle.vue";
-import Column from "@/components/layout/Column.vue";
-import Row from "@/components/layout/Row.vue";
-import Spacer from "@/components/layout/Spacer.vue";
-import Sticky from "@/components/layout/Sticky.vue";
-import VerticalRule from "@/components/layout/VerticalRule.vue";
-import Modal from "@/components/Modal.vue";
-import { createLayerTreeNode, createResetButton } from "@/data/common";
-import { main } from "@/data/mod";
-import themes from "@/data/themes";
-import { createBar, Direction } from "@/features/bars/bar";
-import { createBuyable } from "@/features/buyable";
-import { createChallenge } from "@/features/challenges/challenge";
-import { createClickable } from "@/features/clickables/clickable";
+import Slider from "components/fields/Slider.vue";
+import Text from "components/fields/Text.vue";
+import Toggle from "components/fields/Toggle.vue";
+import Column from "components/layout/Column.vue";
+import Row from "components/layout/Row.vue";
+import Spacer from "components/layout/Spacer.vue";
+import Sticky from "components/layout/Sticky.vue";
+import VerticalRule from "components/layout/VerticalRule.vue";
+import Modal from "components/Modal.vue";
+import { createLayerTreeNode, createResetButton } from "data/common";
+import { main } from "data/projEntry";
+import themes from "data/themes";
+import { createBar, Direction } from "features/bars/bar";
+import { createBuyable } from "features/buyable";
+import { createChallenge } from "features/challenges/challenge";
+import { createClickable } from "features/clickables/clickable";
 import {
     addSoftcap,
     createCumulativeConversion,
-    createExponentialScaling
-} from "@/features/conversion";
-import { jsx, showIf, Visibility } from "@/features/feature";
-import { createHotkey } from "@/features/hotkey";
-import { createInfobox } from "@/features/infoboxes/infobox";
-import { createMilestone } from "@/features/milestones/milestone";
-import { createReset } from "@/features/reset";
-import MainDisplay from "@/features/resources/MainDisplay.vue";
-import { createResource, displayResource, trackBest } from "@/features/resources/resource";
-import Resource from "@/features/resources/Resource.vue";
-import { createTab } from "@/features/tabs/tab";
-import { createTabFamily } from "@/features/tabs/tabFamily";
-import { createTree, createTreeNode, GenericTreeNode, TreeBranch } from "@/features/trees/tree";
-import { createUpgrade } from "@/features/upgrades/upgrade";
-import { createLayer } from "@/game/layers";
-import { persistent } from "@/game/persistence";
-import settings from "@/game/settings";
-import { DecimalSource } from "@/lib/break_eternity";
-import Decimal, { format, formatWhole } from "@/util/bignum";
-import { render, renderCol, renderRow } from "@/util/vue";
+    createPolynomialScaling
+} from "features/conversion";
+import { jsx, showIf, Visibility } from "features/feature";
+import { createHotkey } from "features/hotkey";
+import { createInfobox } from "features/infoboxes/infobox";
+import { createMilestone } from "features/milestones/milestone";
+import { createReset } from "features/reset";
+import MainDisplay from "features/resources/MainDisplay.vue";
+import { createResource, displayResource, trackBest } from "features/resources/resource";
+import Resource from "features/resources/Resource.vue";
+import { createTab } from "features/tabs/tab";
+import { createTabFamily } from "features/tabs/tabFamily";
+import { createTree, createTreeNode, GenericTreeNode, TreeBranch } from "features/trees/tree";
+import { createUpgrade } from "features/upgrades/upgrade";
+import { createLayer } from "game/layers";
+import { persistent } from "game/persistence";
+import settings from "game/settings";
+import { DecimalSource } from "lib/break_eternity";
+import Decimal, { format, formatWhole } from "util/bignum";
+import { render, renderCol, renderRow } from "util/vue";
 import { computed, ComputedRef, ref } from "vue";
 import f from "./f";
 
@@ -346,7 +346,7 @@ const layer = createLayer(() => {
     }));
 
     const conversion = createCumulativeConversion(() => ({
-        scaling: addSoftcap(createExponentialScaling(10, 5, 0.5), 1e100, 0.5),
+        scaling: addSoftcap(createPolynomialScaling(10, 0.5), 1e100, 0.5),
         baseResource: main.points,
         gainResource: points,
         roundUpCost: true

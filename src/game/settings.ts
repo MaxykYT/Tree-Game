@@ -1,8 +1,8 @@
-import modInfo from "@/data/modInfo.json";
-import { Themes } from "@/data/themes";
-import { CoercableComponent } from "@/features/feature";
-import { globalBus } from "@/game/events";
-import { hardReset } from "@/util/save";
+import projInfo from "data/projInfo.json";
+import { Themes } from "data/themes";
+import { CoercableComponent } from "features/feature";
+import { globalBus } from "game/events";
+import { hardReset } from "util/save";
 import { reactive, watch } from "vue";
 
 export interface Settings {
@@ -24,14 +24,17 @@ const state = reactive<Partial<Settings>>({
 watch(
     state,
     state =>
-        localStorage.setItem(modInfo.id, btoa(unescape(encodeURIComponent(JSON.stringify(state))))),
+        localStorage.setItem(
+            projInfo.id,
+            btoa(unescape(encodeURIComponent(JSON.stringify(state))))
+        ),
     { deep: true }
 );
 export default window.settings = state as Settings;
 
 export function loadSettings(): void {
     try {
-        const item: string | null = localStorage.getItem(modInfo.id);
+        const item: string | null = localStorage.getItem(projInfo.id);
         if (item != null && item !== "") {
             const settings = JSON.parse(decodeURIComponent(escape(atob(item))));
             if (typeof settings === "object") {

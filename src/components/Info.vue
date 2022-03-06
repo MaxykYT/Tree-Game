@@ -5,7 +5,9 @@
                 <img class="info-modal-logo" v-if="logo" :src="logo" :alt="title" />
                 <div class="info-modal-title">
                     <h2>{{ title }}</h2>
-                    <h4>v{{ versionNumber }}: {{ versionTitle }}</h4>
+                    <h4>
+                        v{{ versionNumber }}<span v-if="versionTitle">: {{ versionTitle }}</span>
+                    </h4>
                 </div>
             </div>
         </template>
@@ -48,14 +50,14 @@
 </template>
 
 <script setup lang="ts">
-import Modal from "@/components/Modal.vue";
-import type Changelog from "@/data/Changelog.vue";
-import modInfo from "@/data/modInfo.json";
-import player from "@/game/player";
-import { formatTime } from "@/util/bignum";
+import Modal from "components/Modal.vue";
+import type Changelog from "data/Changelog.vue";
+import projInfo from "data/projInfo.json";
+import player from "game/player";
+import { formatTime } from "util/bignum";
 import { computed, ref, toRefs, unref } from "vue";
 
-const { title, logo, author, discordName, discordLink, versionNumber, versionTitle } = modInfo;
+const { title, logo, author, discordName, discordLink, versionNumber, versionTitle } = projInfo;
 
 const _props = defineProps<{ changelog: typeof Changelog | null }>();
 const props = toRefs(_props);

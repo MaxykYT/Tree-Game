@@ -12,7 +12,6 @@
             @touchstart="start"
             @touchend="stop"
             @touchcancel="stop"
-            :disabled="!unref(canClick)"
             :class="{
                 feature: true,
                 clickable: true,
@@ -30,18 +29,18 @@
 </template>
 
 <script lang="tsx">
-import "@/components/common/features.css";
-import LinkNode from "@/components/links/LinkNode.vue";
-import MarkNode from "@/components/MarkNode.vue";
-import { GenericClickable } from "@/features/clickables/clickable";
-import { jsx, StyleValue, Visibility } from "@/features/feature";
+import "components/common/features.css";
+import LinkNode from "components/links/LinkNode.vue";
+import MarkNode from "components/MarkNode.vue";
+import { GenericClickable } from "features/clickables/clickable";
+import { jsx, StyleValue, Visibility } from "features/feature";
 import {
     coerceComponent,
     isCoercableComponent,
     processedPropType,
     setupHoldToClick,
     unwrapRef
-} from "@/util/vue";
+} from "util/vue";
 import {
     Component,
     defineComponent,
