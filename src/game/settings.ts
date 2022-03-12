@@ -59,7 +59,11 @@ export const hardResetSettings = (window.hardResetSettings = () => {
 });
 
 export const settingFields: CoercableComponent[] = reactive([]);
-
 export function registerSettingField(component: CoercableComponent) {
     settingFields.push(component);
+}
+
+export const infoComponents: CoercableComponent[] = reactive([]);
+export function registerInfoComponent(component: CoercableComponent) {
+    infoComponents.push(component);
 }
