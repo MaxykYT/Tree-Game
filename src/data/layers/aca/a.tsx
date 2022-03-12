@@ -40,7 +40,7 @@ const layer = createLayer(() => {
             }
             return "How did this happen?";
         }),
-        shouldEarn: true
+        shouldEarn: () => true
     }));
     const ach2 = createAchievement(() => ({
         display: "Impossible!",
