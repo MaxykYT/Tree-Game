@@ -162,12 +162,11 @@ export function createBuyable<T extends BuyableOptions>(
         buyable.display = jsx(() => {
             // TODO once processComputable types correctly, remove this "as X"
             const currDisplay = unref(display) as BuyableDisplay;
-            if (
-                currDisplay != null &&
-                !isCoercableComponent(currDisplay) &&
-                buyable.cost != null &&
-                buyable.resource != null
-            ) {
+            if (isCoercableComponent(currDisplay)) {
+                const CurrDisplay = coerceComponent(currDisplay);
+                return <CurrDisplay />;
+            }
+            if (currDisplay != null && buyable.cost != null && buyable.resource != null) {
                 const genericBuyable = buyable as GenericBuyable;
                 const Title = coerceComponent(currDisplay.title || "", "h3");
                 const Description = coerceComponent(currDisplay.description);
@@ -226,7 +225,17 @@ export function createBuyable<T extends BuyableOptions>(
         buyable[GatherProps] = function (this: GenericBuyable) {
             const { display, visibility, style, classes, onClick, canClick, small, mark, id } =
                 this;
-            return { display, visibility, style, classes, onClick, canClick, small, mark, id };
+            return {
+                display,
+                visibility,
+                style: unref(style),
+                classes,
+                onClick,
+                canClick,
+                small,
+                mark,
+                id
+            };
         };
 
         return buyable as unknown as Buyable<T>;
