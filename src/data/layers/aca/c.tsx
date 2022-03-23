@@ -22,6 +22,7 @@ import {
 import { jsx, showIf, Visibility } from "features/feature";
 import { createHotkey } from "features/hotkey";
 import { createInfobox } from "features/infoboxes/infobox";
+import { createLinks } from "features/links/links";
 import { createMilestone } from "features/milestones/milestone";
 import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
@@ -466,6 +467,18 @@ const layer = createLayer(() => {
         }
     }));
 
+    const links = createLinks(() => ({
+        links: [
+            {
+                startNode: h,
+                endNode: flatBoi,
+                "stroke-width": "5px",
+                stroke: "red",
+                offsetEnd: { x: -50 + 100 * flatBoi.progress.value.toNumber(), y: 0 }
+            }
+        ]
+    }));
+
     const illuminatiTabs = createTabFamily(() => ({
         tabs: {
             first: {
@@ -635,17 +648,6 @@ const layer = createLayer(() => {
         id,
         color,
         name,
-        links() {
-            const links = tree.links.value.slice();
-            links.push({
-                startNode: h,
-                endNode: flatBoi,
-                "stroke-width": "5px",
-                stroke: "red",
-                offsetEnd: { x: -50 + 100 * flatBoi.progress.value.toNumber(), y: 0 }
-            });
-            return links;
-        },
         points,
         best,
         beep,
@@ -679,7 +681,12 @@ const layer = createLayer(() => {
         confirmRespec,
         minWidth: 800,
         tabs,
-        display: jsx(() => <>{render(tabs)}</>)
+        display: jsx(() => (
+            <>
+                {render(tabs)}
+                {render(links)}
+            </>
+        ))
     };
 });
 

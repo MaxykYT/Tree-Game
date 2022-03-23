@@ -64,7 +64,6 @@ export const main = createLayer(() => {
     return {
         id: "main",
         name: "Tree",
-        links: tree.links,
         display: jsx(() => (
             <>
                 <div v-show={player.devSpeed === 0}>Game Paused</div>
