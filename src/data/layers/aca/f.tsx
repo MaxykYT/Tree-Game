@@ -1,17 +1,21 @@
+import Spacer from "components/layout/Spacer.vue";
 import { createLayerTreeNode, createResetButton } from "data/common";
 import { main } from "data/projEntry";
 import { createClickable } from "features/clickables/clickable";
 import { createPolynomialScaling, createIndependentConversion } from "features/conversion";
 import { jsx } from "features/feature";
 import { createInfobox } from "features/infoboxes/infobox";
+import { createParticles } from "features/particles/particles";
 import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
 import { createResource, displayResource } from "features/resources/resource";
 import { createLayer } from "game/layers";
 import { persistent } from "game/persistence";
 import Decimal, { DecimalSource, formatWhole } from "util/bignum";
-import { render } from "util/vue";
+import { IParticlesOptions } from "tsparticles-engine";
+import { render, renderRow } from "util/vue";
 import c from "./c";
+import confetti from "./confetti.json";
 
 const layer = createLayer(() => {
     const id = "f";
@@ -39,7 +43,7 @@ const layer = createLayer(() => {
         canClick() {
             return clickableState.value !== "Borkened...";
         },
-        onClick() {
+        onClick(e) {
             switch (clickableState.value) {
                 case "Start":
                     clickableState.value = "A new state!";
@@ -51,7 +55,33 @@ const layer = createLayer(() => {
                     clickableState.value = "Maybe that's a bit too far...";
                     break;
                 case "Maybe that's a bit too far...":
-                    //makeParticles(coolParticle, 4)
+                    const pos = e == undefined ? undefined : "touches" in e ? e.touches[0] : e;
+                    particles.addEmitter({
+                        // TODO this case is annoying but required because move.direction is a string rather than keyof MoveDirection
+                        particles: confetti as unknown as IParticlesOptions,
+                        autoPlay: true,
+                        fill: false,
+                        shape: "square",
+                        startCount: 0,
+                        life: {
+                            count: 1,
+                            duration: 0.1,
+                            wait: false
+                        },
+                        rate: {
+                            delay: 0,
+                            quantity: 100
+                        },
+                        position: {
+                            x: (100 * (pos?.clientX ?? 0)) / window.innerWidth,
+                            y: (100 * (pos?.clientY ?? 0)) / window.innerHeight
+                        },
+                        size: {
+                            width: 0,
+                            height: 0,
+                            mode: "precise"
+                        }
+                    });
                     clickableState.value = "Borkened...";
                     break;
                 default:
@@ -86,7 +116,8 @@ const layer = createLayer(() => {
         },
         display() {
             return clickableState.value == "Borkened..." ? "Fix the clickable!" : "Does nothing";
-        }
+        },
+        small: true
     }));
 
     const reset = createReset(() => ({
@@ -143,6 +174,8 @@ const layer = createLayer(() => {
         })
     }));
 
+    const particles = createParticles(() => ({}));
+
     const tab = jsx(() => (
         <>
             {render(coolInfo)}
@@ -154,7 +187,10 @@ const layer = createLayer(() => {
                 <img src="https://images.beano.com/store/24ab3094eb95e5373bca1ccd6f330d4406db8d1f517fc4170b32e146f80d?auto=compress%2Cformat&dpr=1&w=390" />
                 <div>Bork Bork!</div>
             </div>
-            {render(clickable)}
+            <Spacer />
+            {renderRow(resetClickable)}
+            {renderRow(clickable)}
+            {render(particles)}
         </>
     ));
 
@@ -167,7 +203,6 @@ const layer = createLayer(() => {
         coolInfo,
         clickable,
         clickableState,
-        resetClickable,
         reset,
         conversion,
         treeNode,
