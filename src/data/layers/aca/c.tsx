@@ -16,8 +16,11 @@ import { createChallenge } from "features/challenges/challenge";
 import { createClickable } from "features/clickables/clickable";
 import {
     addSoftcap,
+    createAdditiveModifier,
     createCumulativeConversion,
-    createPolynomialScaling
+    createExponentialModifier,
+    createPolynomialScaling,
+    createSequentialModifier
 } from "features/conversion";
 import { jsx, showIf, Visibility } from "features/feature";
 import { createHotkey } from "features/hotkey";
@@ -350,7 +353,11 @@ const layer = createLayer(() => {
         scaling: addSoftcap(createPolynomialScaling(10, 0.5), 1e100, 0.5),
         baseResource: main.points,
         gainResource: points,
-        roundUpCost: true
+        roundUpCost: true,
+        gainModifier: createSequentialModifier(
+            createExponentialModifier(2),
+            createAdditiveModifier(1)
+        )
     }));
 
     const reset = createReset(() => ({
