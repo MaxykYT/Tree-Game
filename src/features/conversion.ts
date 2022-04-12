@@ -1,9 +1,9 @@
 import { GenericLayer } from "game/layers";
+import { Modifier } from "game/modifiers";
 import Decimal, { DecimalSource } from "util/bignum";
 import { isFunction } from "util/common";
 import {
     Computable,
-    convertComputable,
     GetComputableTypeWithDefault,
     processComputable,
     ProcessedComputable
@@ -24,7 +24,7 @@ export interface ConversionOptions {
     buyMax?: Computable<boolean>;
     roundUpCost?: Computable<boolean>;
     convert?: VoidFunction;
-    gainModifier?: GainModifier;
+    gainModifier?: Modifier;
 }
 
 export interface BaseConversion {
@@ -54,11 +54,6 @@ export type GenericConversion = Replace<
         roundUpCost: ProcessedComputable<boolean>;
     }
 >;
-
-export interface GainModifier {
-    apply: (gain: DecimalSource) => DecimalSource;
-    revert: (gain: DecimalSource) => DecimalSource;
-}
 
 export function createConversion<T extends ConversionOptions>(
     optionsFunc: OptionsFunc<T, Conversion<T>, BaseConversion>
@@ -306,36 +301,5 @@ export function addHardcap(
     return {
         ...scaling,
         currentGain: conversion => Decimal.min(scaling.currentGain(conversion), unref(cap))
-    };
-}
-
-export function createAdditiveModifier(addend: Computable<DecimalSource>): GainModifier {
-    const processedAddend = convertComputable(addend);
-    return {
-        apply: gain => Decimal.add(gain, unref(processedAddend)),
-        revert: gain => Decimal.sub(gain, unref(processedAddend))
-    };
-}
-
-export function createMultiplicativeModifier(multiplier: Computable<DecimalSource>): GainModifier {
-    const processedMultiplier = convertComputable(multiplier);
-    return {
-        apply: gain => Decimal.times(gain, unref(processedMultiplier)),
-        revert: gain => Decimal.div(gain, unref(processedMultiplier))
-    };
-}
-
-export function createExponentialModifier(exponent: Computable<DecimalSource>): GainModifier {
-    const processedExponent = convertComputable(exponent);
-    return {
-        apply: gain => Decimal.pow(gain, unref(processedExponent)),
-        revert: gain => Decimal.root(gain, unref(processedExponent))
-    };
-}
-
-export function createSequentialModifier(...modifiers: GainModifier[]): GainModifier {
-    return {
-        apply: gain => modifiers.reduce((gain, modifier) => modifier.apply(gain), gain),
-        revert: gain => modifiers.reduceRight((gain, modifier) => modifier.revert(gain), gain)
     };
 }
