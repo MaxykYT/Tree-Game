@@ -4,19 +4,20 @@ import { isFunction } from "util/common";
 import {
     Computable,
     convertComputable,
-    DoNotCache,
     GetComputableTypeWithDefault,
     processComputable,
     ProcessedComputable
 } from "util/computed";
 import { createLazyProxy } from "util/proxies";
 import { computed, isRef, Ref, unref } from "vue";
-import { Replace, setDefault } from "./feature";
+import { OptionsFunc, Replace, setDefault } from "./feature";
 import { Resource } from "./resources/resource";
 
 export interface ConversionOptions {
     scaling: ScalingFunction;
     currentGain?: Computable<DecimalSource>;
+    actualGain?: Computable<DecimalSource>;
+    currentAt?: Computable<DecimalSource>;
     nextAt?: Computable<DecimalSource>;
     baseResource: Resource;
     gainResource: Resource;
@@ -34,6 +35,8 @@ export type Conversion<T extends ConversionOptions> = Replace<
     T & BaseConversion,
     {
         currentGain: GetComputableTypeWithDefault<T["currentGain"], Ref<DecimalSource>>;
+        actualGain: GetComputableTypeWithDefault<T["actualGain"], Ref<DecimalSource>>;
+        currentAt: GetComputableTypeWithDefault<T["currentAt"], Ref<DecimalSource>>;
         nextAt: GetComputableTypeWithDefault<T["nextAt"], Ref<DecimalSource>>;
         buyMax: GetComputableTypeWithDefault<T["buyMax"], true>;
         roundUpCost: GetComputableTypeWithDefault<T["roundUpCost"], true>;
@@ -44,6 +47,8 @@ export type GenericConversion = Replace<
     Conversion<ConversionOptions>,
     {
         currentGain: ProcessedComputable<DecimalSource>;
+        actualGain: ProcessedComputable<DecimalSource>;
+        currentAt: ProcessedComputable<DecimalSource>;
         nextAt: ProcessedComputable<DecimalSource>;
         buyMax: ProcessedComputable<boolean>;
         roundUpCost: ProcessedComputable<boolean>;
@@ -56,10 +61,10 @@ export interface GainModifier {
 }
 
 export function createConversion<T extends ConversionOptions>(
-    optionsFunc: () => T & ThisType<Conversion<T>>
+    optionsFunc: OptionsFunc<T, Conversion<T>, BaseConversion>
 ): Conversion<T> {
     return createLazyProxy(() => {
-        const conversion: T = optionsFunc();
+        const conversion = optionsFunc();
 
         if (conversion.currentGain == null) {
             conversion.currentGain = computed(() => {
@@ -70,10 +75,20 @@ export function createConversion<T extends ConversionOptions>(
                     : conversion.scaling.currentGain(conversion as GenericConversion);
                 gain = Decimal.floor(gain).max(0);
 
-                if (!conversion.buyMax) {
+                if (!unref(conversion.buyMax)) {
                     gain = gain.min(1);
                 }
                 return gain;
+            });
+        }
+        if (conversion.actualGain == null) {
+            conversion.actualGain = conversion.currentGain;
+        }
+        if (conversion.currentAt == null) {
+            conversion.currentAt = computed(() => {
+                let current = conversion.scaling.currentAt(conversion as GenericConversion);
+                if (conversion.roundUpCost) current = Decimal.ceil(current);
+                return current;
             });
         }
         if (conversion.nextAt == null) {
@@ -96,6 +111,8 @@ export function createConversion<T extends ConversionOptions>(
         }
 
         processComputable(conversion as T, "currentGain");
+        processComputable(conversion as T, "actualGain");
+        processComputable(conversion as T, "currentAt");
         processComputable(conversion as T, "nextAt");
         processComputable(conversion as T, "buyMax");
         setDefault(conversion, "buyMax", true);
@@ -108,6 +125,7 @@ export function createConversion<T extends ConversionOptions>(
 
 export type ScalingFunction = {
     currentGain: (conversion: GenericConversion) => DecimalSource;
+    currentAt: (conversion: GenericConversion) => DecimalSource;
     nextAt: (conversion: GenericConversion) => DecimalSource;
 };
 
@@ -128,11 +146,20 @@ export function createLinearScaling(
                 .times(unref(coefficient))
                 .add(1);
         },
+        currentAt(conversion) {
+            let current: DecimalSource = unref(conversion.currentGain);
+            if (conversion.gainModifier) {
+                current = conversion.gainModifier.revert(current);
+            }
+            current = Decimal.max(0, current);
+            return Decimal.times(current, unref(coefficient)).add(unref(base));
+        },
         nextAt(conversion) {
             let next: DecimalSource = Decimal.add(unref(conversion.currentGain), 1);
             if (conversion.gainModifier) {
                 next = conversion.gainModifier.revert(next);
             }
+            next = Decimal.max(0, next);
             return Decimal.times(next, unref(coefficient)).add(unref(base)).max(unref(base));
         }
     };
@@ -155,24 +182,33 @@ export function createPolynomialScaling(
             }
             return gain;
         },
+        currentAt(conversion) {
+            let current: DecimalSource = unref(conversion.currentGain);
+            if (conversion.gainModifier) {
+                current = conversion.gainModifier.revert(current);
+            }
+            current = Decimal.max(0, current);
+            return Decimal.root(current, unref(exponent)).times(unref(base));
+        },
         nextAt(conversion) {
             let next: DecimalSource = Decimal.add(unref(conversion.currentGain), 1);
             if (conversion.gainModifier) {
                 next = conversion.gainModifier.revert(next);
             }
+            next = Decimal.max(0, next);
             return Decimal.root(next, unref(exponent)).times(unref(base)).max(unref(base));
         }
     };
 }
 
 export function createCumulativeConversion<S extends ConversionOptions>(
-    optionsFunc: () => S & ThisType<Conversion<S>>
+    optionsFunc: OptionsFunc<S, Conversion<S>>
 ): Conversion<S> {
     return createConversion(optionsFunc);
 }
 
 export function createIndependentConversion<S extends ConversionOptions>(
-    optionsFunc: () => S & ThisType<Conversion<S>>
+    optionsFunc: OptionsFunc<S, Conversion<S>>
 ): Conversion<S> {
     return createConversion(() => {
         const conversion: S = optionsFunc();
@@ -180,14 +216,32 @@ export function createIndependentConversion<S extends ConversionOptions>(
         setDefault(conversion, "buyMax", false);
 
         if (conversion.currentGain == null) {
-            conversion.currentGain = computed(() =>
-                Decimal.sub(
+            conversion.currentGain = computed(() => {
+                let gain = conversion.gainModifier
+                    ? conversion.gainModifier.apply(
+                          conversion.scaling.currentGain(conversion as GenericConversion)
+                      )
+                    : conversion.scaling.currentGain(conversion as GenericConversion);
+                gain = Decimal.floor(gain).max(conversion.gainResource.value);
+
+                if (!unref(conversion.buyMax)) {
+                    gain = gain.min(Decimal.add(conversion.gainResource.value, 1));
+                }
+                return gain;
+            });
+        }
+        if (conversion.actualGain == null) {
+            conversion.actualGain = computed(() => {
+                let gain = Decimal.sub(
                     conversion.scaling.currentGain(conversion as GenericConversion),
                     conversion.gainResource.value
-                )
-                    .add(1)
-                    .max(1)
-            );
+                ).max(0);
+
+                if (!unref(conversion.buyMax)) {
+                    gain = gain.min(1);
+                }
+                return gain;
+            });
         }
         setDefault(conversion, "convert", function () {
             conversion.gainResource.value = conversion.gainModifier

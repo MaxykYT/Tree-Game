@@ -16,7 +16,7 @@ import f from "./layers/aca/f";
 /**
  * @hidden
  */
-export const main = createLayer(() => {
+export const main = createLayer("main", () => {
     const points = createResource<DecimalSource>(10);
     const best = trackBest(points);
     const total = trackTotal(points);
@@ -62,7 +62,6 @@ export const main = createLayer(() => {
     //  but I'd recommend it over trying to remember what does and doesn't need to be included.
     // Officially all you need are anything with persistency or that you want to access elsewhere
     return {
-        id: "main",
         name: "Tree",
         display: jsx(() => (
             <>
