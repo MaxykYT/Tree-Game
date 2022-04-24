@@ -10,15 +10,16 @@ import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
 import { createResource, displayResource } from "features/resources/resource";
 import { createLayer } from "game/layers";
+import { createMultiplicativeModifier } from "game/modifiers";
 import { persistent } from "game/persistence";
 import Decimal, { DecimalSource, formatWhole } from "util/bignum";
-import { IParticlesOptions } from "tsparticles-engine";
 import { render, renderRow } from "util/vue";
+import { ref } from "vue";
 import c from "./c";
 import confetti from "./confetti.json";
 
-const layer = createLayer(() => {
-    const id = "f";
+const id = "f";
+const layer = createLayer(id, () => {
     const color = "#FE0102";
     const name = "Farms";
     const points = createResource<DecimalSource>(0, "farm points");
@@ -56,32 +57,13 @@ const layer = createLayer(() => {
                     break;
                 case "Maybe that's a bit too far...":
                     const pos = e == undefined ? undefined : "touches" in e ? e.touches[0] : e;
-                    particles.addEmitter({
-                        // TODO this case is annoying but required because move.direction is a string rather than keyof MoveDirection
-                        particles: confetti as unknown as IParticlesOptions,
-                        autoPlay: true,
-                        fill: false,
-                        shape: "square",
-                        startCount: 0,
-                        life: {
-                            count: 1,
-                            duration: 0.1,
-                            wait: false
-                        },
-                        rate: {
-                            delay: 0,
-                            quantity: 100
-                        },
-                        position: {
-                            x: (100 * (pos?.clientX ?? 0)) / window.innerWidth,
-                            y: (100 * (pos?.clientY ?? 0)) / window.innerHeight
-                        },
-                        size: {
-                            width: 0,
-                            height: 0,
-                            mode: "precise"
+                    const confettiParticles = Object.assign({}, confetti, {
+                        pos: {
+                            x: (pos?.clientX ?? 0) - (particles.boundingRect?.value?.left ?? 0),
+                            y: (pos?.clientY ?? 0) - (particles.boundingRect?.value?.top ?? 0)
                         }
                     });
+                    particles.addEmitter(confettiParticles).then(e => e.playOnceAndDestroy());
                     clickableState.value = "Borkened...";
                     break;
                 default:
@@ -128,7 +110,7 @@ const layer = createLayer(() => {
         scaling: createPolynomialScaling(10, 0.5),
         baseResource: main.points,
         gainResource: points,
-        modifyGainAmount: gain => Decimal.times(gain, c.otherThingy.value)
+        modifyGainAmount: createMultiplicativeModifier(c.otherThingy)
     }));
 
     const treeNode = createLayerTreeNode(() => ({
@@ -174,7 +156,13 @@ const layer = createLayer(() => {
         })
     }));
 
-    const particles = createParticles(() => ({}));
+    const particles = createParticles(() => ({
+        boundingRect: ref<null | DOMRect>(null),
+        onContainerResized(boundingRect) {
+            this.boundingRect.value = boundingRect;
+        },
+        style: "z-index: 2"
+    }));
 
     const tab = jsx(() => (
         <>

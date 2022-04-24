@@ -1,5 +1,5 @@
 import Row from "components/layout/Row.vue";
-import Tooltip from "components/Tooltip.vue";
+import Tooltip from "features/tooltips/Tooltip.vue";
 import { main } from "data/projEntry";
 import { createAchievement } from "features/achievements/achievement";
 import { jsx } from "features/feature";
@@ -13,8 +13,8 @@ import { render, renderRow } from "util/vue";
 import { computed } from "vue";
 import f from "./f";
 
-const layer = createLayer(() => {
-    const id = "a";
+const id = "a";
+const layer = createLayer(id, () => {
     const color = "yellow";
     const name = "Achievements";
     const points = createResource<DecimalSource>(0, "achievement power");

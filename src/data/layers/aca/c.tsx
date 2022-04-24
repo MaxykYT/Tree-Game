@@ -16,11 +16,8 @@ import { createChallenge } from "features/challenges/challenge";
 import { createClickable } from "features/clickables/clickable";
 import {
     addSoftcap,
-    createAdditiveModifier,
     createCumulativeConversion,
-    createExponentialModifier,
-    createPolynomialScaling,
-    createSequentialModifier
+    createPolynomialScaling
 } from "features/conversion";
 import { jsx, showIf, Visibility } from "features/feature";
 import { createHotkey } from "features/hotkey";
@@ -36,6 +33,11 @@ import { createTabFamily } from "features/tabs/tabFamily";
 import { createTree, createTreeNode, GenericTreeNode, TreeBranch } from "features/trees/tree";
 import { createUpgrade } from "features/upgrades/upgrade";
 import { createLayer } from "game/layers";
+import {
+    createAdditiveModifier,
+    createExponentialModifier,
+    createSequentialModifier
+} from "game/modifiers";
 import { persistent } from "game/persistence";
 import settings from "game/settings";
 import { DecimalSource } from "lib/break_eternity";
@@ -44,8 +46,8 @@ import { render, renderCol, renderRow } from "util/vue";
 import { computed, ComputedRef, ref } from "vue";
 import f from "./f";
 
-const layer = createLayer(() => {
-    const id = "c";
+const id = "c";
+const layer = createLayer(id, () => {
     const color = "#4BDC13";
     const name = "Candies";
     const points = createResource<DecimalSource>(0, "lollipops");
@@ -486,9 +488,9 @@ const layer = createLayer(() => {
         ]
     }));
 
-    const illuminatiTabs = createTabFamily(() => ({
-        tabs: {
-            first: {
+    const illuminatiTabs = createTabFamily(
+        {
+            first: () => ({
                 tab: jsx(() => (
                     <>
                         {renderRow(...upgrades)}
@@ -497,159 +499,157 @@ const layer = createLayer(() => {
                     </>
                 )),
                 display: "first"
-            },
-            second: {
+            }),
+            second: () => ({
                 tab: f.display,
                 display: "second"
-            }
+            })
         },
-        style: {
-            width: "660px",
-            backgroundColor: "brown",
-            "--background": "brown",
-            border: "solid white",
-            marginLeft: "auto",
-            marginRight: "auto"
-        }
-    }));
-
-    const tabs = createTabFamily(() => ({
-        tabs: {
-            mainTab: {
-                tab: createTab(() => ({
-                    display: jsx(() => (
-                        <>
-                            <MainDisplay
-                                resource={points}
-                                color={color}
-                                effectDisplay={`which are boosting waffles by ${format(
-                                    waffleBoost.value
-                                )} and increasing the Ice Cream cap by ${format(
-                                    icecreamCap.value
-                                )}`}
-                            />
-                            <Sticky>{render(resetButton)}</Sticky>
-                            <Resource resource={points} color={color} />
-                            <Spacer height="5px" />
-                            <button onClick={() => console.log("yeet")}>'HI'</button>
-                            <div>Name your points!</div>
-                            <Text
-                                modelValue={thingy.value}
-                                onUpdate:modelValue={value => (thingy.value = value)}
-                            />
-                            <Sticky style="color: red; font-size: 32px; font-family: Comic Sans MS;">
-                                I have {displayResource(main.points)} {thingy.value} points!
-                            </Sticky>
-                            <hr />
-                            {renderCol(...lollipopMilestones)}
-                            <Spacer />
-                            {renderRow(...upgrades)}
-                            {renderRow(quasiUpgrade)}
-                            {renderRow(funChallenge)}
-                        </>
-                    ))
-                })),
-                display: "main tab",
-                glowColor() {
-                    if (
-                        generatorUpgrade.canPurchase.value ||
-                        lollipopMultiplierUpgrade.canPurchase.value ||
-                        unlockIlluminatiUpgrade.canPurchase.value ||
-                        funChallenge.canComplete.value
-                    ) {
-                        return "blue";
-                    }
-                    return "";
-                },
-                style: { color: "orange" }
-            },
-            thingies: {
-                tab: createTab(() => ({
-                    style() {
-                        return { backgroundColor: "#222222", "--background": "#222222" };
-                    },
-                    display: jsx(() => (
-                        <>
-                            {render(buyablesDisplay)}
-                            <Spacer />
-                            <Row style="width: 600px; height: 350px; background-color: green; border-style: solid;">
-                                <Toggle
-                                    onUpdate:modelValue={value => (beep.value = value)}
-                                    modelValue={beep.value}
-                                />
-                                <Spacer width="30px" height="10px" />
-                                <div>
-                                    <span>Beep</span>
-                                </div>
-                                <Spacer />
-                                <VerticalRule height="200px" />
-                            </Row>
-                            <Spacer />
-                            <img src="https://unsoftcapped2.github.io/The-Modding-Tree-2/discord.png" />
-                        </>
-                    ))
-                })),
-                glowColor: "white",
-                display: "thingies",
-                style: { borderColor: "orange" }
-            },
-            jail: {
-                tab: createTab(() => ({
-                    display: jsx(() => (
-                        <>
-                            {render(coolInfo)}
-                            {render(longBoi)}
-                            <Spacer />
-                            <Row>
-                                <Column style="background-color: #555555; padding: 15px">
-                                    <div style="color: teal">Sugar level:</div>
-                                    <Spacer />
-                                    {render(tallBoi)}
-                                </Column>
-                                <Spacer />
-                                <Column>
-                                    <div>idk</div>
-                                    <Spacer width="0" height="50px" />
-                                    {render(flatBoi)}
-                                </Column>
-                            </Row>
-                            <Spacer />
-                            <div>It's jail because "bars"! So funny! Ha ha!</div>
-                            {render(tree)}
-                        </>
-                    ))
-                })),
-                display: "jail"
-            },
-            illuminati: {
-                tab: createTab(() => ({
-                    display: jsx(() => (
-                        // This should really just be <> and </>, however for some reason the
-                        // typescript interpreter can't figure out this layer and f.tsx otherwise
-                        <div>
-                            <h1> C O N F I R M E D </h1>
-                            <Spacer />
-                            {render(illuminatiTabs)}
-                            <div>Adjust how many points H gives you!</div>
-                            <Slider
-                                onUpdate:modelValue={value => (otherThingy.value = value)}
-                                modelValue={otherThingy.value}
-                                min={1}
-                                max={30}
-                            />
-                        </div>
-                    )),
-                    style: {
-                        backgroundColor: "#3325CC"
-                    }
-                })),
-                visibility() {
-                    return showIf(unlockIlluminatiUpgrade.bought.value);
-                },
-                display: "illuminati"
+        () => ({
+            style: {
+                width: "660px",
+                backgroundColor: "brown",
+                "--background": "brown",
+                border: "solid white",
+                marginLeft: "auto",
+                marginRight: "auto"
             }
-        }
-    }));
+        })
+    );
+
+    const tabs = createTabFamily({
+        mainTab: () => ({
+            tab: createTab(() => ({
+                display: jsx(() => (
+                    <>
+                        <MainDisplay
+                            resource={points}
+                            color={color}
+                            effectDisplay={`which are boosting waffles by ${format(
+                                waffleBoost.value
+                            )} and increasing the Ice Cream cap by ${format(icecreamCap.value)}`}
+                        />
+                        <Sticky>{render(resetButton)}</Sticky>
+                        <Resource resource={points} color={color} />
+                        <Spacer height="5px" />
+                        <button onClick={() => console.log("yeet")}>'HI'</button>
+                        <div>Name your points!</div>
+                        <Text
+                            modelValue={thingy.value}
+                            onUpdate:modelValue={value => (thingy.value = value)}
+                        />
+                        <Sticky style="color: red; font-size: 32px; font-family: Comic Sans MS;">
+                            I have {displayResource(main.points)} {thingy.value} points!
+                        </Sticky>
+                        <hr />
+                        {renderCol(...lollipopMilestones)}
+                        <Spacer />
+                        {renderRow(...upgrades)}
+                        {renderRow(quasiUpgrade)}
+                        {renderRow(funChallenge)}
+                    </>
+                ))
+            })),
+            display: "main tab",
+            glowColor() {
+                if (
+                    generatorUpgrade.canPurchase.value ||
+                    lollipopMultiplierUpgrade.canPurchase.value ||
+                    unlockIlluminatiUpgrade.canPurchase.value ||
+                    funChallenge.canComplete.value
+                ) {
+                    return "blue";
+                }
+                return "";
+            },
+            style: { color: "orange" }
+        }),
+        thingies: () => ({
+            tab: createTab(() => ({
+                style() {
+                    return { backgroundColor: "#222222", "--background": "#222222" };
+                },
+                display: jsx(() => (
+                    <>
+                        {render(buyablesDisplay)}
+                        <Spacer />
+                        <Row style="width: 600px; height: 350px; background-color: green; border-style: solid;">
+                            <Toggle
+                                onUpdate:modelValue={value => (beep.value = value)}
+                                modelValue={beep.value}
+                            />
+                            <Spacer width="30px" height="10px" />
+                            <div>
+                                <span>Beep</span>
+                            </div>
+                            <Spacer />
+                            <VerticalRule height="200px" />
+                        </Row>
+                        <Spacer />
+                        <img src="https://unsoftcapped2.github.io/The-Modding-Tree-2/discord.png" />
+                    </>
+                ))
+            })),
+            glowColor: "white",
+            display: "thingies",
+            style: { borderColor: "orange" }
+        }),
+        jail: () => ({
+            tab: createTab(() => ({
+                display: jsx(() => (
+                    <>
+                        {render(coolInfo)}
+                        {render(longBoi)}
+                        <Spacer />
+                        <Row>
+                            <Column style="background-color: #555555; padding: 15px">
+                                <div style="color: teal">Sugar level:</div>
+                                <Spacer />
+                                {render(tallBoi)}
+                            </Column>
+                            <Spacer />
+                            <Column>
+                                <div>idk</div>
+                                <Spacer width="0" height="50px" />
+                                {render(flatBoi)}
+                            </Column>
+                        </Row>
+                        <Spacer />
+                        <div>It's jail because "bars"! So funny! Ha ha!</div>
+                        {render(tree)}
+                    </>
+                ))
+            })),
+            display: "jail"
+        }),
+        illuminati: () => ({
+            tab: createTab(() => ({
+                display: jsx(() => (
+                    // This should really just be <> and </>, however for some reason the
+                    // typescript interpreter can't figure out this layer and f.tsx otherwise
+                    <div>
+                        <h1> C O N F I R M E D </h1>
+                        <Spacer />
+                        {render(illuminatiTabs)}
+                        <div>Adjust how many points H gives you!</div>
+                        <Slider
+                            onUpdate:modelValue={value => (otherThingy.value = value)}
+                            modelValue={otherThingy.value}
+                            min={1}
+                            max={30}
+                        />
+                    </div>
+                )),
+                style: {
+                    backgroundColor: "#3325CC"
+                }
+            })),
+            visibility() {
+                return showIf(unlockIlluminatiUpgrade.bought.value);
+            },
+            display: "illuminati"
+        })
+    });
 
     return {
         id,
