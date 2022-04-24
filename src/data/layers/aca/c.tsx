@@ -30,12 +30,20 @@ import { createResource, displayResource, trackBest } from "features/resources/r
 import Resource from "features/resources/Resource.vue";
 import { createTab } from "features/tabs/tab";
 import { createTabFamily } from "features/tabs/tabFamily";
-import { createTree, createTreeNode, GenericTreeNode, TreeBranch } from "features/trees/tree";
+import { addTooltip, TooltipDirection } from "features/tooltips/tooltip";
+import {
+    createResourceTooltip,
+    createTree,
+    createTreeNode,
+    GenericTreeNode,
+    TreeBranch
+} from "features/trees/tree";
 import { createUpgrade } from "features/upgrades/upgrade";
 import { createLayer } from "game/layers";
 import {
     createAdditiveModifier,
     createExponentialModifier,
+    createModifierSection,
     createSequentialModifier
 } from "game/modifiers";
 import { persistent } from "game/persistence";
@@ -357,8 +365,8 @@ const layer = createLayer(id, () => {
         gainResource: points,
         roundUpCost: true,
         gainModifier: createSequentialModifier(
-            createExponentialModifier(2),
-            createAdditiveModifier(1)
+            createExponentialModifier(2, "Because I felt like it"),
+            createAdditiveModifier(1, "Nice modifier")
         )
     }));
 
@@ -404,6 +412,10 @@ const layer = createLayer(id, () => {
             textDecoration: "underline"
         }
     }));
+    addTooltip(treeNode, {
+        display: createResourceTooltip(points),
+        pinnable: true
+    });
 
     const resetButton = createResetButton(() => ({
         conversion,
@@ -414,6 +426,19 @@ const layer = createLayer(id, () => {
         },
         resetDescription: "Melt your points into "
     }));
+    addTooltip(resetButton, {
+        display: jsx(() =>
+            createModifierSection(
+                "Modifiers",
+                "",
+                conversion.gainModifier,
+                conversion.scaling.currentGain(conversion)
+            )
+        ),
+        pinnable: true,
+        direction: TooltipDirection.DOWN,
+        style: "width: 400px; text-align: left"
+    });
 
     const g = createTreeNode(() => ({
         display: "TH",

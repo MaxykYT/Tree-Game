@@ -9,6 +9,8 @@ import { createParticles } from "features/particles/particles";
 import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
 import { createResource, displayResource } from "features/resources/resource";
+import { addTooltip } from "features/tooltips/tooltip";
+import { createResourceTooltip } from "features/trees/tree";
 import { createLayer } from "game/layers";
 import { createMultiplicativeModifier } from "game/modifiers";
 import { persistent } from "game/persistence";
@@ -129,6 +131,10 @@ const layer = createLayer(id, () => {
             return Decimal.gte(main.points.value, 10);
         }
     }));
+    addTooltip(treeNode, {
+        display: createResourceTooltip(points),
+        pinnable: true
+    });
 
     const resetButton = createResetButton(() => ({
         conversion,
