@@ -201,6 +201,7 @@ const layer = createLayer(id, () => {
         conversion,
         treeNode,
         resetButton,
+        minWidth: 650,
         display: tab
     };
 });
