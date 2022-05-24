@@ -6,6 +6,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2022-05-10
+### Added
+- findFeatures can now accept multiple feature types
+- excludeFeatures can now be used to find features with a feature type _blacklist_
+- All the icons in the saves manager now have tooltips
+### Changed
+- All touch events that can be passive now are
+- Layers' style and classes attributes are now applied to the tab element rather than the layer-tab
+- Saving now always uses lz-string, and saveEncoding has been renamed to exportEncoding
+    - The property will now only affect exports, and defaults to base64 so exports can be shared in more places without issues
+- Buyables can now have their onClick/purchase function overwritten
+### Fixed
+- Arrays in player were not being wrapped in proxies for things like NaN detection
+- Error when switching between saves with different layers
+- Links would sometimes error from trying to use nodes that were removed earlier that frame
+- createModifierSection would require modifiers to have revert and enabled properties despite not using them
+- Tab buttons would not use the style property if it was a ref
+- Typings on the Board vue component were incorrect
+- Offline time would always show, if offlineLimit is set to 0
+- Buyables will now call onPurchase() when cost and/or resource were not set
+- Presets dropdown wouldn't deselect the option after creating the save
+### Documented
+- feature.ts
+
+## [0.4.0] - 2022-05-01
+### Added
+- Saves can now be encoded in two new options: plaintext and lz compressed, determined by a new "saveEncoding" property in projInfo
+    - Saves will be loaded in whatever format is detected. The setting only applies when writing saves
+- createModifierSection has new parameter to override the label used for the base value
+- createCollapsibleModifierSections utility function to display `createModifierSection`s in collapsible forms
+### Fixed
+- Saves manager would not clear the current save from its cache when switching saves, leading to progress loss if flipping between saves
+- Layer.minWidth being ignored
+- Separators between tabs (player.tabs) would not extend to the bottom of the screen when scrolling
+- Tree nodes not being clicked on their edges
+### Changed
+- **BREAKING** No features extend persistent anymore
+    - This will break ALL existing saves that aren't manually dealt with in fixOldSave
+    - Affected features: Achievement, Buyable, Grid, Infobox, Milestone, TabFamily, and Upgrade
+    - Affected features will now have a property within them where the persistent ref is stored. This means new persistent refs can now be safely added to these features
+- Features with option functions with 0 required properties now don't require passing in an options function
+- Improved the look of the goBack and minimize buttons (and made them more consistent with each other)
+- Newly created saves are immediately switched to
+- TooltipDirection and Direction have been merged into one enum
+- Made layers shallow reactive, so it works better with dynamic layers
+- Modifier functions all have more explicit types now
+- Scaling functions take computables instead of processed computables
+### Removed
+- Unused tsParticles.d.ts file
+### Documented
+- modifiers.ts
+- conversions.ts
+
 ## [0.3.3] - 2022-04-24
 ### Fixed
 - Spacing between rows in Tree components
