@@ -10,7 +10,7 @@ import Modal from "components/Modal.vue";
 import { createLayerTreeNode, createResetButton } from "data/common";
 import { main } from "data/projEntry";
 import themes from "data/themes";
-import { createBar, Direction } from "features/bars/bar";
+import { createBar } from "features/bars/bar";
 import { createBuyable } from "features/buyable";
 import { createChallenge } from "features/challenges/challenge";
 import { createClickable } from "features/clickables/clickable";
@@ -30,7 +30,7 @@ import { createResource, displayResource, trackBest } from "features/resources/r
 import Resource from "features/resources/Resource.vue";
 import { createTab } from "features/tabs/tab";
 import { createTabFamily } from "features/tabs/tabFamily";
-import { addTooltip, TooltipDirection } from "features/tooltips/tooltip";
+import { addTooltip } from "features/tooltips/tooltip";
 import {
     createResourceTooltip,
     createTree,
@@ -50,6 +50,7 @@ import { persistent } from "game/persistence";
 import settings from "game/settings";
 import { DecimalSource } from "lib/break_eternity";
 import Decimal, { format, formatWhole } from "util/bignum";
+import { Direction } from "util/common";
 import { render, renderCol, renderRow } from "util/vue";
 import { computed, ComputedRef, ref } from "vue";
 import f from "./f";
@@ -228,7 +229,7 @@ const layer = createLayer(id, () => {
             };
         },
         onPurchase(cost) {
-            spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost);
+            spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost ?? 0);
         },
         style: { height: "222px" },
         purchaseLimit: 4
@@ -436,7 +437,7 @@ const layer = createLayer(id, () => {
             )
         ),
         pinnable: true,
-        direction: TooltipDirection.DOWN,
+        direction: Direction.Down,
         style: "width: 400px; text-align: left"
     });
 
