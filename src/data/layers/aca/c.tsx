@@ -40,6 +40,7 @@ import {
 } from "features/trees/tree";
 import { createUpgrade } from "features/upgrades/upgrade";
 import { createLayer } from "game/layers";
+import type { Modifier } from "game/modifiers";
 import {
     createAdditiveModifier,
     createExponentialModifier,
@@ -50,6 +51,7 @@ import { persistent } from "game/persistence";
 import settings from "game/settings";
 import { DecimalSource } from "lib/break_eternity";
 import Decimal, { format, formatWhole } from "util/bignum";
+import type { WithRequired } from "util/common";
 import { Direction } from "util/common";
 import { render, renderCol, renderRow } from "util/vue";
 import { computed, ComputedRef, ref } from "vue";
@@ -368,7 +370,7 @@ const layer = createLayer(id, () => {
         gainModifier: createSequentialModifier(
             createExponentialModifier(2, "Because I felt like it"),
             createAdditiveModifier(1, "Nice modifier")
-        )
+        ) as WithRequired<Modifier, "description" | "revert">
     }));
 
     const reset = createReset(() => ({
