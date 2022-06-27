@@ -1,9 +1,10 @@
 {
-	"title": "Profectus",
+	"title": "Profectus Demo",
+	"description": "A demo project made in Profectus",
 	"id": "profectus-demo",
-	"author": "thepaperpilot",
-	"discordName": "The Paper Pilot Community",
-	"discordLink": "https://discord.gg/WzejVAx",
+	"author": "",
+	"discordName": "",
+	"discordLink": "",
 
 	"versionNumber": "0.0",
 	"versionTitle": "Initial Commit",
