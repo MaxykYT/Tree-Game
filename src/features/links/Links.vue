@@ -14,8 +14,9 @@
 
 <script setup lang="ts">
 import type { Link } from "features/links/links";
+import type { FeatureNode } from "game/layers";
 import { BoundsInjectionKey, NodesInjectionKey } from "game/layers";
-import { computed, inject, ref, toRef, watch } from "vue";
+import { computed, inject, onMounted, ref, toRef, watch } from "vue";
 import LinkVue from "./Link.vue";
 
 const _props = defineProps<{ links?: Link[] }>();
@@ -23,15 +24,14 @@ const links = toRef(_props, "links");
 
 const resizeListener = ref<Element | null>(null);
 
-// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-const nodes = inject(NodesInjectionKey)!;
-// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-const outerBoundingRect = inject(BoundsInjectionKey)!;
-const boundingRect = ref<DOMRect | undefined>(undefined);
+const nodes = inject(NodesInjectionKey, ref<Record<string, FeatureNode | undefined>>({}));
+const outerBoundingRect = inject(BoundsInjectionKey, ref<DOMRect | undefined>(undefined));
+const boundingRect = ref<DOMRect | undefined>(resizeListener.value?.getBoundingClientRect());
 watch(
-    [outerBoundingRect],
+    outerBoundingRect,
     () => (boundingRect.value = resizeListener.value?.getBoundingClientRect())
 );
+onMounted(() => (boundingRect.value = resizeListener.value?.getBoundingClientRect()));
 
 const validLinks = computed(() => {
     const n = nodes.value;

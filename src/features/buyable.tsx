@@ -24,8 +24,9 @@ export type BuyableDisplay =
     | CoercableComponent
     | {
           title?: CoercableComponent;
-          description: CoercableComponent;
+          description?: CoercableComponent;
           effectDisplay?: CoercableComponent;
+          showAmount?: boolean;
       };
 
 export interface BuyableOptions {
@@ -168,17 +169,8 @@ export function createBuyable<T extends BuyableOptions>(
             if (currDisplay != null && buyable.cost != null && buyable.resource != null) {
                 const genericBuyable = buyable as GenericBuyable;
                 const Title = coerceComponent(currDisplay.title || "", "h3");
-                const Description = coerceComponent(currDisplay.description);
+                const Description = coerceComponent(currDisplay.description || "");
                 const EffectDisplay = coerceComponent(currDisplay.effectDisplay || "");
-                const amountDisplay =
-                    unref(genericBuyable.purchaseLimit) === Decimal.dInf ? (
-                        <>Amount: {formatWhole(genericBuyable.amount.value)}</>
-                    ) : (
-                        <>
-                            Amount: {formatWhole(genericBuyable.amount.value)} /{" "}
-                            {formatWhole(unref(genericBuyable.purchaseLimit))}
-                        </>
-                    );
 
                 return (
                     <span>
@@ -187,11 +179,20 @@ export function createBuyable<T extends BuyableOptions>(
                                 <Title />
                             </div>
                         ) : null}
-                        <Description />
-                        <div>
-                            <br />
-                            {amountDisplay}
-                        </div>
+                        {currDisplay.description ? <Description /> : null}
+                        {currDisplay.showAmount === false ? null : (
+                            <div>
+                                <br />
+                                {unref(genericBuyable.purchaseLimit) === Decimal.dInf ? (
+                                    <>Amount: {formatWhole(genericBuyable.amount.value)}</>
+                                ) : (
+                                    <>
+                                        Amount: {formatWhole(genericBuyable.amount.value)} /{" "}
+                                        {formatWhole(unref(genericBuyable.purchaseLimit))}
+                                    </>
+                                )}
+                            </div>
+                        )}
                         {currDisplay.effectDisplay ? (
                             <div>
                                 <br />
