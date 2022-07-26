@@ -112,7 +112,7 @@ const layer = createLayer(id, () => {
         scaling: createPolynomialScaling(10, 0.5),
         baseResource: main.points,
         gainResource: points,
-        modifyGainAmount: createMultiplicativeModifier(c.otherThingy)
+        modifyGainAmount: createMultiplicativeModifier(() => ({ multiplier: c.otherThingy }))
     }));
 
     const treeNode = createLayerTreeNode(() => ({
