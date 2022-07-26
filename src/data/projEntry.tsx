@@ -5,7 +5,7 @@ import { createResource, trackBest, trackOOMPS, trackTotal } from "features/reso
 import type { GenericTree } from "features/trees/tree";
 import { branchedResetPropagation, createTree } from "features/trees/tree";
 import { globalBus } from "game/events";
-import type { GenericLayer } from "game/layers";
+import type { BaseLayer, GenericLayer } from "game/layers";
 import { setupLayerModal } from "game/layers";
 import { createLayer } from "game/layers";
 import type { PlayerData } from "game/player";
@@ -21,7 +21,7 @@ import f from "./layers/aca/f";
 /**
  * @hidden
  */
-export const main = createLayer("main", () => {
+export const main = createLayer("main", function (this: BaseLayer) {
     const points = createResource<DecimalSource>(10);
     const best = trackBest(points);
     const total = trackTotal(points);
