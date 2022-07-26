@@ -367,13 +367,13 @@ const layer = createLayer(id, () => {
         baseResource: main.points,
         gainResource: points,
         roundUpCost: true,
-        gainModifier: createSequentialModifier(
+        gainModifier: createSequentialModifier(() => [
             createExponentialModifier(() => ({
                 exponent: 2,
                 description: "Because I felt like it"
             })),
             createAdditiveModifier(() => ({ addend: 1, description: "Nice modifier" }))
-        ) as WithRequired<Modifier, "description" | "revert">
+        ]) as WithRequired<Modifier, "description" | "revert">
     }));
 
     const reset = createReset(() => ({
