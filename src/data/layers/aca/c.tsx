@@ -214,23 +214,24 @@ const layer = createLayer(id, () => {
     }));
     const upgrades = [generatorUpgrade, lollipopMultiplierUpgrade, unlockIlluminatiUpgrade];
 
-    const exhancers = createRepeatable(() => ({
-        requirements: createCostRequirement(() => ({
-            resource: noPersist(points),
-            cost() {
-                let x = new Decimal(exhancers.amount.value);
-                if (x.gte(25)) {
-                    x = x.pow(2).div(25);
-                }
-                const cost = Decimal.pow(2, x.pow(1.5));
-                return cost.floor();
-            },
-            pay(amount) {
-                const cost = unref(this.cost as unknown as ProcessedComputable<DecimalSource>);
-                spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost ?? 0);
-                this.resource.value = Decimal.sub(this.resource.value, cost).max(0);
+    const exhancersCost = createCostRequirement(() => ({
+        resource: noPersist(points),
+        cost() {
+            let x = new Decimal(exhancers.amount.value);
+            if (x.gte(25)) {
+                x = x.pow(2).div(25);
             }
-        })),
+            const cost = Decimal.pow(2, x.pow(1.5));
+            return cost.floor();
+        },
+        pay(amount) {
+            const cost = unref(this.cost as unknown as ProcessedComputable<DecimalSource>);
+            spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost ?? 0);
+            this.resource.value = Decimal.sub(this.resource.value, cost).max(0);
+        }
+    }));
+    const exhancers = createRepeatable(() => ({
+        requirements: exhancersCost,
         display() {
             return {
                 title: "Exhancers",
@@ -280,7 +281,7 @@ const layer = createLayer(id, () => {
                 return;
             }
             exhancers.amount.value = Decimal.sub(exhancers.amount.value, 1);
-            const cost = (exhancers.requirements.cost as Ref<DecimalSource>).value;
+            const cost = (exhancersCost.cost as Ref<DecimalSource>).value;
             points.value = Decimal.add(points.value, cost);
             spentOnBuyables.value = Decimal.sub(spentOnBuyables.value, cost);
         }
