@@ -18,7 +18,6 @@ import { Visibility, jsx } from "features/feature";
 import { createHotkey } from "features/hotkey";
 import { createInfobox } from "features/infoboxes/infobox";
 import { createLinks } from "features/links/links";
-import { createMilestone } from "features/milestones/milestone";
 import { createRepeatable } from "features/repeatable";
 import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
@@ -35,7 +34,6 @@ import {
     createTreeNode
 } from "features/trees/tree";
 import { createUpgrade } from "features/upgrades/upgrade";
-import Formula, { calculateCost } from "game/formulas/formulas";
 import { createLayer } from "game/layers";
 import {
     createAdditiveModifier,
@@ -44,7 +42,7 @@ import {
     createSequentialModifier
 } from "game/modifiers";
 import { noPersist, persistent } from "game/persistence";
-import { createCostRequirement } from "game/requirements";
+import { createBooleanRequirement, createCostRequirement } from "game/requirements";
 import settings from "game/settings";
 import { DecimalSource } from "lib/break_eternity";
 import Decimal, { format, formatWhole } from "util/bignum";
@@ -53,6 +51,7 @@ import { render, renderCol, renderRow } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import f from "./f";
 import { ProcessedComputable } from "util/computed";
+import { createAchievement } from "features/achievements/achievement";
 
 const id = "c";
 const layer = createLayer(id, () => {
@@ -76,20 +75,16 @@ const layer = createLayer(id, () => {
         color: "rgb(75, 220, 19)"
     }));
 
-    const lollipopMilestone3 = createMilestone(() => ({
-        shouldEarn() {
-            return Decimal.gte(best.value, 3);
-        },
+    const lollipopMilestone3 = createAchievement(() => ({
+        requirements: createBooleanRequirement(() => Decimal.gte(best.value, 3)),
         display: {
             requirement: "3 Lollipops",
             effectDisplay: "Unlock the next milestone"
         }
     }));
-    const lollipopMilestone4 = createMilestone(() => ({
+    const lollipopMilestone4 = createAchievement(() => ({
         visibility: lollipopMilestone3.earned,
-        shouldEarn() {
-            return Decimal.gte(best.value, 4);
-        },
+        requirements: createBooleanRequirement(() => Decimal.gte(best.value, 4)),
         display: {
             requirement: "4 Lollipops",
             effectDisplay: "You can toggle beep and boop (which do nothing)",

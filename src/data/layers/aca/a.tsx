@@ -1,17 +1,16 @@
-import Row from "components/layout/Row.vue";
-import Tooltip from "features/tooltips/Tooltip.vue";
 import { main } from "data/projEntry";
 import { createAchievement } from "features/achievements/achievement";
 import { jsx } from "features/feature";
 import { createGrid } from "features/grids/grid";
 import { createResource } from "features/resources/resource";
+import Tooltip from "features/tooltips/Tooltip.vue";
+import { addTooltip } from "features/tooltips/tooltip";
 import { createTreeNode } from "features/trees/tree";
 import { createLayer } from "game/layers";
 import { DecimalSource } from "lib/break_eternity";
 import Decimal from "util/bignum";
-import { render, renderRow } from "util/vue";
-import { computed } from "vue";
-import f from "./f";
+import { Direction } from "util/common";
+import { renderRow } from "util/vue";
 
 const id = "a";
 const layer = createLayer(id, () => {
@@ -34,35 +33,44 @@ const layer = createLayer(id, () => {
     const ach1 = createAchievement(() => ({
         image: "https://unsoftcapped2.github.io/The-Modding-Tree-2/discord.png",
         display: "Get me!",
-        tooltip: computed(() => {
+        requirements: [],
+        small: true
+    }));
+    addTooltip(ach1, {
+        display() {
             if (ach1.earned.value) {
                 return "You did it!";
             }
             return "How did this happen?";
-        }),
-        shouldEarn: () => true
-    }));
+        },
+        direction: Direction.Down
+    });
     const ach2 = createAchievement(() => ({
         display: "Impossible!",
-        tooltip: computed(() => {
+        style: { color: "#04e050" }
+    }));
+    addTooltip(ach2, {
+        display() {
             if (ach2.earned.value) {
                 return "HOW????";
             }
             return "Mwahahaha!";
-        }),
-        style: { color: "#04e050" }
-    }));
+        },
+        direction: Direction.Down
+    });
     const ach3 = createAchievement(() => ({
         display: "EIEIO",
-        tooltip:
-            "Get a farm point.\n\nReward: The dinosaur is now your friend (you can max Farm Points).",
-        shouldEarn: function () {
-            return Decimal.gte(f.points.value, 1);
-        },
+        requirements: [],
         onComplete() {
             console.log("Bork bork bork!");
-        }
+        },
+        small: true
     }));
+    addTooltip(ach3, {
+        display:
+            "Get a farm point.\n\nReward: The dinosaur is now your friend (you can max Farm Points).",
+        direction: Direction.Down
+    });
     const achievements = [ach1, ach2, ach3];
 
     const grid = createGrid(() => ({
@@ -105,17 +113,7 @@ const layer = createLayer(id, () => {
 
     const display = jsx(() => (
         <>
-            <Row>
-                <Tooltip display={ach1.tooltip} bottom>
-                    {render(ach1)}
-                </Tooltip>
-                <Tooltip display={ach2.tooltip} bottom>
-                    {render(ach2)}
-                </Tooltip>
-                <Tooltip display={ach3.tooltip} bottom>
-                    {render(ach3)}
-                </Tooltip>
-            </Row>
+            {renderRow(...achievements)}
             {renderRow(grid)}
         </>
     ));
