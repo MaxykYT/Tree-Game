@@ -13,7 +13,7 @@ import { addTooltip } from "features/tooltips/tooltip";
 import { createResourceTooltip } from "features/trees/tree";
 import Formula from "game/formulas/formulas";
 import { createLayer } from "game/layers";
-import { persistent } from "game/persistence";
+import { noPersist, persistent } from "game/persistence";
 import Decimal, { DecimalSource, formatWhole } from "util/bignum";
 import { render, renderRow } from "util/vue";
 import { ref } from "vue";
@@ -109,9 +109,9 @@ const layer = createLayer(id, () => {
     }));
 
     const conversion = createIndependentConversion(() => ({
-        formula: Formula.variable(0).div(10).sqrt().times(c.otherThingy),
+        formula: x => x.div(10).sqrt().times(c.otherThingy),
         baseResource: main.points,
-        gainResource: points
+        gainResource: noPersist(points)
     }));
 
     const treeNode = createLayerTreeNode(() => ({
@@ -130,7 +130,7 @@ const layer = createLayer(id, () => {
             return Decimal.gte(main.points.value, 10);
         }
     }));
-    addTooltip(treeNode, {
+    const tooltip = addTooltip(treeNode, {
         display: createResourceTooltip(points),
         pinnable: true
     });
@@ -201,7 +201,8 @@ const layer = createLayer(id, () => {
         treeNode,
         resetButton,
         minWidth: 650,
-        display: tab
+        display: tab,
+        tooltip
     };
 });
 

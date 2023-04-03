@@ -25,7 +25,7 @@ import MainDisplay from "features/resources/MainDisplay.vue";
 import Resource from "features/resources/Resource.vue";
 import { createResource, displayResource, trackBest } from "features/resources/resource";
 import { createTab } from "features/tabs/tab";
-import { createTabFamily } from "features/tabs/tabFamily";
+import { GenericTabFamily, createTabFamily } from "features/tabs/tabFamily";
 import { addTooltip } from "features/tooltips/tooltip";
 import {
     GenericTreeNode,
@@ -35,7 +35,7 @@ import {
     createTreeNode
 } from "features/trees/tree";
 import { createUpgrade } from "features/upgrades/upgrade";
-import Formula from "game/formulas/formulas";
+import Formula, { calculateCost } from "game/formulas/formulas";
 import { createLayer } from "game/layers";
 import {
     createAdditiveModifier,
@@ -43,7 +43,7 @@ import {
     createModifierSection,
     createSequentialModifier
 } from "game/modifiers";
-import { persistent } from "game/persistence";
+import { noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
 import settings from "game/settings";
 import { DecimalSource } from "lib/break_eternity";
@@ -52,6 +52,7 @@ import { Direction } from "util/common";
 import { render, renderCol, renderRow } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import f from "./f";
+import { ProcessedComputable } from "util/computed";
 
 const id = "c";
 const layer = createLayer(id, () => {
@@ -160,7 +161,7 @@ const layer = createLayer(id, () => {
         },
         requirements: createCostRequirement(() => ({
             cost: 1,
-            resource: points
+            resource: noPersist(points)
         }))
     }));
     const lollipopMultiplierUpgrade = createUpgrade(() => ({
@@ -170,7 +171,7 @@ const layer = createLayer(id, () => {
         }),
         requirements: createCostRequirement(() => ({
             cost: 1,
-            resource: points
+            resource: noPersist(points)
         })),
         visibility: generatorUpgrade.bought
     }));
@@ -215,7 +216,7 @@ const layer = createLayer(id, () => {
 
     const exhancers = createRepeatable(() => ({
         requirements: createCostRequirement(() => ({
-            resource: points,
+            resource: noPersist(points),
             cost() {
                 let x = new Decimal(exhancers.amount.value);
                 if (x.gte(25)) {
@@ -225,16 +226,7 @@ const layer = createLayer(id, () => {
                 return cost.floor();
             },
             pay(amount) {
-                const cost =
-                    this.cost instanceof Formula
-                        ? calculateCost(
-                              this.cost,
-                              amount ?? 1,
-                              unref(
-                                  this.spendResources as ProcessedComputable<boolean> | undefined
-                              ) ?? true
-                          )
-                        : unref(this.cost as ProcessedComputable<DecimalSource>);
+                const cost = unref(this.cost as unknown as ProcessedComputable<DecimalSource>);
                 spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost ?? 0);
                 this.resource.value = Decimal.sub(this.resource.value, cost).max(0);
             }
@@ -385,15 +377,16 @@ const layer = createLayer(id, () => {
         createAdditiveModifier(() => ({ addend: 1, description: "Nice modifier" }))
     ]);
     const conversion = createCumulativeConversion(() => ({
-        formula: modifierToFormula(
-            conversionModifier,
-            Formula.variable(0)
-                .div(10)
-                .sqrt()
-                .step(1e100, f => f.sqrt())
-        ),
+        formula: x =>
+            modifierToFormula(
+                conversionModifier,
+                x
+                    .div(10)
+                    .sqrt()
+                    .step(1e100, f => f.sqrt())
+            ),
         baseResource: main.points,
-        gainResource: points,
+        gainResource: noPersist(points),
         roundUpCost: true
     }));
 
@@ -439,7 +432,7 @@ const layer = createLayer(id, () => {
             textDecoration: "underline"
         }
     }));
-    addTooltip(treeNode, {
+    const treeNodeTooltip = addTooltip(treeNode, {
         display: createResourceTooltip(points),
         pinnable: true
     });
@@ -453,7 +446,7 @@ const layer = createLayer(id, () => {
         },
         resetDescription: "Melt your points into "
     }));
-    addTooltip(resetButton, {
+    const resetButtonTooltip = addTooltip(resetButton, {
         display: jsx(() =>
             createModifierSection({
                 title: "Modifiers",
@@ -565,7 +558,7 @@ const layer = createLayer(id, () => {
                 marginRight: "auto"
             }
         })
-    );
+    ) as GenericTabFamily;
 
     const tabs = createTabFamily({
         mainTab: () => ({
@@ -722,6 +715,7 @@ const layer = createLayer(id, () => {
         quasiUpgrade,
         exhancers,
         respecBuyables,
+        illuminatiTabs,
         sellExhancer,
         bars: { tallBoi, longBoi, flatBoi },
         tree,
@@ -741,7 +735,9 @@ const layer = createLayer(id, () => {
                 {render(tabs)}
                 {render(links)}
             </>
-        ))
+        )),
+        treeNodeTooltip,
+        resetButtonTooltip
     };
 });
 
