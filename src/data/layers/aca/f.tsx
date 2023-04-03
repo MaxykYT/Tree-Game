@@ -2,7 +2,7 @@ import Spacer from "components/layout/Spacer.vue";
 import { createLayerTreeNode, createResetButton } from "data/common";
 import { main } from "data/projEntry";
 import { createClickable } from "features/clickables/clickable";
-import { createPolynomialScaling, createIndependentConversion } from "features/conversion";
+import { createIndependentConversion } from "features/conversion";
 import { jsx } from "features/feature";
 import { createInfobox } from "features/infoboxes/infobox";
 import { createParticles } from "features/particles/particles";
@@ -11,8 +11,8 @@ import MainDisplay from "features/resources/MainDisplay.vue";
 import { createResource, displayResource } from "features/resources/resource";
 import { addTooltip } from "features/tooltips/tooltip";
 import { createResourceTooltip } from "features/trees/tree";
+import Formula from "game/formulas/formulas";
 import { createLayer } from "game/layers";
-import { createMultiplicativeModifier } from "game/modifiers";
 import { persistent } from "game/persistence";
 import Decimal, { DecimalSource, formatWhole } from "util/bignum";
 import { render, renderRow } from "util/vue";
@@ -109,10 +109,9 @@ const layer = createLayer(id, () => {
     }));
 
     const conversion = createIndependentConversion(() => ({
-        scaling: createPolynomialScaling(10, 0.5),
+        formula: Formula.variable(0).div(10).sqrt().times(c.otherThingy),
         baseResource: main.points,
-        gainResource: points,
-        modifyGainAmount: createMultiplicativeModifier(() => ({ multiplier: c.otherThingy }))
+        gainResource: points
     }));
 
     const treeNode = createLayerTreeNode(() => ({

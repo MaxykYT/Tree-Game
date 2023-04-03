@@ -293,6 +293,24 @@ export function createSequentialModifier<
     }) as unknown as S;
 }
 
+/** An object that configures a modifier section via {@link createModifierSection}. */
+export interface ModifierSectionOptions {
+    /** The header for the section. */
+    title: string;
+    /** Smaller text that appears in the header after the title. */
+    subtitle?: string;
+    /** The modifier to render. */
+    modifier: WithRequired<Modifier, "description">;
+    /** The base value that'll be passed into the modifier. Defaults to 1. */
+    base?: DecimalSource;
+    /** The unit of the value being modified, if any. */
+    unit?: string;
+    /** The label to use for the base value. Defaults to "Base". */
+    baseText?: CoercableComponent;
+    /** Determines if numbers larger or smaller than the base should be displayed as red. */
+    smallerIsBetter?: boolean;
+}
+
 /**
  * Create a JSX element that displays a modifier.
  * Intended to be used with the output from {@link createSequentialModifier}.

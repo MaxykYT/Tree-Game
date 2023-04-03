@@ -1,3 +1,4 @@
+import Modal from "components/Modal.vue";
 import Slider from "components/fields/Slider.vue";
 import Text from "components/fields/Text.vue";
 import Toggle from "components/fields/Toggle.vue";
@@ -6,41 +7,36 @@ import Row from "components/layout/Row.vue";
 import Spacer from "components/layout/Spacer.vue";
 import Sticky from "components/layout/Sticky.vue";
 import VerticalRule from "components/layout/VerticalRule.vue";
-import Modal from "components/Modal.vue";
-import { createLayerTreeNode, createResetButton } from "data/common";
+import { createLayerTreeNode, createResetButton, modifierToFormula } from "data/common";
 import { main } from "data/projEntry";
 import themes from "data/themes";
 import { createBar } from "features/bars/bar";
-import { createBuyable } from "features/buyable";
 import { createChallenge } from "features/challenges/challenge";
 import { createClickable } from "features/clickables/clickable";
-import {
-    addSoftcap,
-    createCumulativeConversion,
-    createPolynomialScaling
-} from "features/conversion";
-import { jsx, showIf, Visibility } from "features/feature";
+import { createCumulativeConversion } from "features/conversion";
+import { Visibility, jsx } from "features/feature";
 import { createHotkey } from "features/hotkey";
 import { createInfobox } from "features/infoboxes/infobox";
 import { createLinks } from "features/links/links";
 import { createMilestone } from "features/milestones/milestone";
+import { createRepeatable } from "features/repeatable";
 import { createReset } from "features/reset";
 import MainDisplay from "features/resources/MainDisplay.vue";
-import { createResource, displayResource, trackBest } from "features/resources/resource";
 import Resource from "features/resources/Resource.vue";
+import { createResource, displayResource, trackBest } from "features/resources/resource";
 import { createTab } from "features/tabs/tab";
 import { createTabFamily } from "features/tabs/tabFamily";
 import { addTooltip } from "features/tooltips/tooltip";
 import {
+    GenericTreeNode,
+    TreeBranch,
     createResourceTooltip,
     createTree,
-    createTreeNode,
-    GenericTreeNode,
-    TreeBranch
+    createTreeNode
 } from "features/trees/tree";
 import { createUpgrade } from "features/upgrades/upgrade";
+import Formula from "game/formulas/formulas";
 import { createLayer } from "game/layers";
-import type { Modifier } from "game/modifiers";
 import {
     createAdditiveModifier,
     createExponentialModifier,
@@ -48,13 +44,13 @@ import {
     createSequentialModifier
 } from "game/modifiers";
 import { persistent } from "game/persistence";
+import { createCostRequirement } from "game/requirements";
 import settings from "game/settings";
 import { DecimalSource } from "lib/break_eternity";
 import Decimal, { format, formatWhole } from "util/bignum";
-import type { WithRequired } from "util/common";
 import { Direction } from "util/common";
 import { render, renderCol, renderRow } from "util/vue";
-import { computed, ComputedRef, ref } from "vue";
+import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import f from "./f";
 
 const id = "c";
@@ -89,9 +85,7 @@ const layer = createLayer(id, () => {
         }
     }));
     const lollipopMilestone4 = createMilestone(() => ({
-        visibility() {
-            return showIf(lollipopMilestone3.earned.value);
-        },
+        visibility: lollipopMilestone3.earned,
         shouldEarn() {
             return Decimal.gte(best.value, 4);
         },
@@ -114,7 +108,7 @@ const layer = createLayer(id, () => {
             ))
         },
         style() {
-            if (this.earned) {
+            if (unref(this.earned)) {
                 return { backgroundColor: "#1111DD" };
             }
             return {};
@@ -124,6 +118,11 @@ const layer = createLayer(id, () => {
 
     const funChallenge = createChallenge(() => ({
         title: "Fun",
+        requirements: createCostRequirement(() => ({
+            resource: main.points,
+            cost: 20,
+            spendResources: false
+        })),
         completionLimit: 3,
         display() {
             return {
@@ -135,11 +134,7 @@ const layer = createLayer(id, () => {
                 effectDisplay: format(funEffect.value) + "x"
             };
         },
-        visibility() {
-            return showIf(Decimal.gt(best.value, 0));
-        },
-        goal: 20,
-        resource: main.points,
+        visibility: () => Decimal.gt(best.value, 0),
         onComplete() {
             console.log("hiii");
         },
@@ -163,17 +158,21 @@ const layer = createLayer(id, () => {
             title: "Generator of Genericness",
             description: "Gain 1 point every second"
         },
-        cost: 1,
-        resource: points
+        requirements: createCostRequirement(() => ({
+            cost: 1,
+            resource: points
+        }))
     }));
     const lollipopMultiplierUpgrade = createUpgrade(() => ({
         display: () => ({
             description: "Point generation is faster based on your unspent Lollipops",
             effectDisplay: `${format(lollipopMultiplierEffect.value)}x`
         }),
-        cost: 1,
-        resource: points,
-        visibility: () => showIf(generatorUpgrade.bought.value)
+        requirements: createCostRequirement(() => ({
+            cost: 1,
+            resource: points
+        })),
+        visibility: generatorUpgrade.bought
     }));
     const lollipopMultiplierEffect = computed(() => {
         let ret = Decimal.add(points.value, 1).pow(0.5);
@@ -181,30 +180,32 @@ const layer = createLayer(id, () => {
         return ret;
     });
     const unlockIlluminatiUpgrade = createUpgrade(() => ({
-        visibility() {
-            return showIf(lollipopMultiplierUpgrade.bought.value);
-        },
-        canAfford() {
-            return Decimal.lt(main.points.value, 7);
-        },
+        visibility: lollipopMultiplierUpgrade.bought,
+        requirements: createCostRequirement(() => ({
+            cost: 7,
+            resource: main.points,
+            requiresPay: false
+        })),
         onPurchase() {
             main.points.value = Decimal.add(main.points.value, 7);
         },
         display:
             "Only buyable with less than 7 points, and gives you 7 more. Unlocks a secret subtab.",
         style() {
-            if (this.bought) {
+            if (unref(this.bought)) {
                 return { backgroundColor: "#1111dd" };
             }
-            if (!this.canAfford) {
+            if (!unref(this.canPurchase)) {
                 return { backgroundColor: "#dd1111" };
             }
             return {};
         }
     }));
     const quasiUpgrade = createUpgrade(() => ({
-        resource: createResource(exhancers.amount, "Exhancers", 0),
-        cost: 3,
+        requirements: createCostRequirement(() => ({
+            resource: createResource(exhancers.amount, "Exhancers", 0),
+            cost: 3
+        })),
         display: {
             title: "This upgrade doesn't exist",
             description: "Or does it?"
@@ -212,16 +213,32 @@ const layer = createLayer(id, () => {
     }));
     const upgrades = [generatorUpgrade, lollipopMultiplierUpgrade, unlockIlluminatiUpgrade];
 
-    const exhancers = createBuyable(() => ({
-        resource: points,
-        cost() {
-            let x = new Decimal(this.amount.value);
-            if (x.gte(25)) {
-                x = x.pow(2).div(25);
+    const exhancers = createRepeatable(() => ({
+        requirements: createCostRequirement(() => ({
+            resource: points,
+            cost() {
+                let x = new Decimal(exhancers.amount.value);
+                if (x.gte(25)) {
+                    x = x.pow(2).div(25);
+                }
+                const cost = Decimal.pow(2, x.pow(1.5));
+                return cost.floor();
+            },
+            pay(amount) {
+                const cost =
+                    this.cost instanceof Formula
+                        ? calculateCost(
+                              this.cost,
+                              amount ?? 1,
+                              unref(
+                                  this.spendResources as ProcessedComputable<boolean> | undefined
+                              ) ?? true
+                          )
+                        : unref(this.cost as ProcessedComputable<DecimalSource>);
+                spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost ?? 0);
+                this.resource.value = Decimal.sub(this.resource.value, cost).max(0);
             }
-            const cost = Decimal.pow(2, x.pow(1.5));
-            return cost.floor();
-        },
+        })),
         display() {
             return {
                 title: "Exhancers",
@@ -229,9 +246,6 @@ const layer = createLayer(id, () => {
                     thingEffect.value
                 )} things and multiplies stuff by ${format(stuffEffect.value)}.`
             };
-        },
-        onPurchase(cost) {
-            spentOnBuyables.value = Decimal.add(spentOnBuyables.value, cost ?? 0);
         },
         style: { height: "222px" },
         purchaseLimit: 4
@@ -274,8 +288,9 @@ const layer = createLayer(id, () => {
                 return;
             }
             exhancers.amount.value = Decimal.sub(exhancers.amount.value, 1);
-            points.value = Decimal.add(points.value, exhancers.cost.value);
-            spentOnBuyables.value = Decimal.sub(spentOnBuyables.value, exhancers.cost.value);
+            const cost = (exhancers.requirements.cost as Ref<DecimalSource>).value;
+            points.value = Decimal.add(points.value, cost);
+            spentOnBuyables.value = Decimal.sub(spentOnBuyables.value, cost);
         }
     }));
     const buyablesDisplay = jsx(() => (
@@ -362,18 +377,24 @@ const layer = createLayer(id, () => {
         }
     }));
 
+    const conversionModifier = createSequentialModifier(() => [
+        createExponentialModifier(() => ({
+            exponent: 2,
+            description: "Because I felt like it"
+        })),
+        createAdditiveModifier(() => ({ addend: 1, description: "Nice modifier" }))
+    ]);
     const conversion = createCumulativeConversion(() => ({
-        scaling: addSoftcap(createPolynomialScaling(10, 0.5), 1e100, 0.5),
+        formula: modifierToFormula(
+            conversionModifier,
+            Formula.variable(0)
+                .div(10)
+                .sqrt()
+                .step(1e100, f => f.sqrt())
+        ),
         baseResource: main.points,
         gainResource: points,
-        roundUpCost: true,
-        gainModifier: createSequentialModifier(() => [
-            createExponentialModifier(() => ({
-                exponent: 2,
-                description: "Because I felt like it"
-            })),
-            createAdditiveModifier(() => ({ addend: 1, description: "Nice modifier" }))
-        ]) as WithRequired<Modifier, "description" | "revert">
+        roundUpCost: true
     }));
 
     const reset = createReset(() => ({
@@ -434,12 +455,10 @@ const layer = createLayer(id, () => {
     }));
     addTooltip(resetButton, {
         display: jsx(() =>
-            createModifierSection(
-                "Modifiers",
-                "",
-                conversion.gainModifier,
-                conversion.scaling.currentGain(conversion)
-            )
+            createModifierSection({
+                title: "Modifiers",
+                modifier: conversionModifier
+            })
         ),
         pinnable: true,
         direction: Direction.Down,
@@ -587,7 +606,7 @@ const layer = createLayer(id, () => {
                     generatorUpgrade.canPurchase.value ||
                     lollipopMultiplierUpgrade.canPurchase.value ||
                     unlockIlluminatiUpgrade.canPurchase.value ||
-                    funChallenge.canComplete.value
+                    Decimal.gt(funChallenge.canComplete.value, 0)
                 ) {
                     return "blue";
                 }
@@ -675,9 +694,7 @@ const layer = createLayer(id, () => {
                     backgroundColor: "#3325CC"
                 }
             })),
-            visibility() {
-                return showIf(unlockIlluminatiUpgrade.bought.value);
-            },
+            visibility: unlockIlluminatiUpgrade.bought,
             display: "illuminati"
         })
     });
