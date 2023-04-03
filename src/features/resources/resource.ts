@@ -1,10 +1,14 @@
 import { globalBus } from "game/events";
-import type { State } from "game/persistence";
+import { NonPersistent, Persistent, State } from "game/persistence";
 import { persistent } from "game/persistence";
+import player from "game/player";
+import settings from "game/settings";
 import type { DecimalSource } from "util/bignum";
 import Decimal, { format, formatWhole } from "util/bignum";
+import type { ProcessedComputable } from "util/computed";
+import { loadingSave } from "util/save";
 import type { ComputedRef, Ref } from "vue";
-import { computed, isRef, ref, watch } from "vue";
+import { computed, isRef, ref, unref, watch } from "vue";
 
 export interface Resource<T = DecimalSource> extends Ref<T> {
     displayName: string;
@@ -13,23 +17,46 @@ export interface Resource<T = DecimalSource> extends Ref<T> {
 }
 
 export function createResource<T extends State>(
+    defaultValue: T,
+    displayName?: string,
+    precision?: number,
+    small?: boolean | undefined
+): Resource<T> & Persistent<T> & { [NonPersistent]: Resource<T> };
+export function createResource<T extends State>(
+    defaultValue: Ref<T>,
+    displayName?: string,
+    precision?: number,
+    small?: boolean | undefined
+): Resource<T>;
+export function createResource<T extends State>(
     defaultValue: T | Ref<T>,
     displayName = "points",
     precision = 0,
-    small = undefined
-): Resource<T> {
+    small: boolean | undefined = undefined
+) {
     const resource: Partial<Resource<T>> = isRef(defaultValue)
         ? defaultValue
         : persistent(defaultValue);
     resource.displayName = displayName;
     resource.precision = precision;
     resource.small = small;
+    if (!isRef(defaultValue)) {
+        const nonPersistentResource = (resource as Persistent<T>)[
+            NonPersistent
+        ] as unknown as Resource<T>;
+        nonPersistentResource.displayName = displayName;
+        nonPersistentResource.precision = precision;
+        nonPersistentResource.small = small;
+    }
     return resource as Resource<T>;
 }
 
 export function trackBest(resource: Resource): Ref<DecimalSource> {
     const best = persistent(resource.value);
     watch(resource, amount => {
+        if (loadingSave.value) {
+            return;
+        }
         if (Decimal.gt(amount, best.value)) {
             best.value = amount;
         }
@@ -40,6 +67,9 @@ export function trackBest(resource: Resource): Ref<DecimalSource> {
 export function trackTotal(resource: Resource): Ref<DecimalSource> {
     const total = persistent(resource.value);
     watch(resource, (amount, prevAmount) => {
+        if (loadingSave.value) {
+            return;
+        }
         if (Decimal.gt(amount, prevAmount)) {
             total.value = Decimal.add(total.value, Decimal.sub(amount, prevAmount));
         }
@@ -110,7 +140,14 @@ export function trackOOMPS(
 export function displayResource(resource: Resource, overrideAmount?: DecimalSource): string {
     const amount = overrideAmount ?? resource.value;
     if (Decimal.eq(resource.precision, 0)) {
-        return formatWhole(amount);
+        return formatWhole(resource.small ? amount : Decimal.floor(amount));
     }
     return format(amount, resource.precision, resource.small);
+}
+
+export function unwrapResource(resource: ProcessedComputable<Resource>): Resource {
+    if ("displayName" in resource) {
+        return resource;
+    }
+    return unref(resource);
 }

@@ -171,7 +171,7 @@ function getCellHandler(id: string): ProxyHandler<GenericGrid> {
 
 export interface GridCell {
     id: string;
-    visibility: Visibility;
+    visibility: Visibility | boolean;
     canClick: boolean;
     startState: State;
     state: State;
@@ -184,10 +184,10 @@ export interface GridCell {
 }
 
 export interface GridOptions {
-    visibility?: Computable<Visibility>;
+    visibility?: Computable<Visibility | boolean>;
     rows: Computable<number>;
     cols: Computable<number>;
-    getVisibility?: CellComputable<Visibility>;
+    getVisibility?: CellComputable<Visibility | boolean>;
     getCanClick?: CellComputable<boolean>;
     getStartState: Computable<State> | ((id: string | number) => State);
     getStyle?: CellComputable<StyleValue>;
@@ -229,8 +229,8 @@ export type Grid<T extends GridOptions> = Replace<
 export type GenericGrid = Replace<
     Grid<GridOptions>,
     {
-        visibility: ProcessedComputable<Visibility>;
-        getVisibility: ProcessedComputable<Visibility>;
+        visibility: ProcessedComputable<Visibility | boolean>;
+        getVisibility: ProcessedComputable<Visibility | boolean>;
         getCanClick: ProcessedComputable<boolean>;
     }
 >;
@@ -238,7 +238,7 @@ export type GenericGrid = Replace<
 export function createGrid<T extends GridOptions>(
     optionsFunc: OptionsFunc<T, BaseGrid, GenericGrid>
 ): Grid<T> {
-    const cellState = persistent<Record<string | number, State>>({});
+    const cellState = persistent<Record<string | number, State>>({}, false);
     return createLazyProxy(() => {
         const grid = optionsFunc();
         grid.id = getUniqueID("grid-");
@@ -277,9 +277,9 @@ export function createGrid<T extends GridOptions>(
 
         if (grid.onClick) {
             const onClick = grid.onClick.bind(grid);
-            grid.onClick = function (id, state) {
+            grid.onClick = function (id, state, e) {
                 if (unref((grid as GenericGrid).cells[id].canClick)) {
-                    onClick(id, state);
+                    onClick(id, state, e);
                 }
             };
         }

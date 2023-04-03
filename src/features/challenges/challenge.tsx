@@ -2,12 +2,20 @@ import { isArray } from "@vue/shared";
 import Toggle from "components/fields/Toggle.vue";
 import ChallengeComponent from "features/challenges/Challenge.vue";
 import type { CoercableComponent, OptionsFunc, Replace, StyleValue } from "features/feature";
-import { Component, GatherProps, getUniqueID, jsx, setDefault, Visibility } from "features/feature";
+import {
+    Component,
+    GatherProps,
+    getUniqueID,
+    isVisible,
+    jsx,
+    setDefault,
+    Visibility
+} from "features/feature";
 import type { GenericReset } from "features/reset";
-import type { Resource } from "features/resources/resource";
 import { globalBus } from "game/events";
 import type { Persistent } from "game/persistence";
 import { persistent } from "game/persistence";
+import { maxRequirementsMet, Requirements } from "game/requirements";
 import settings, { registerSettingField } from "game/settings";
 import type { DecimalSource } from "util/bignum";
 import Decimal from "util/bignum";
@@ -25,14 +33,13 @@ import { computed, unref, watch } from "vue";
 export const ChallengeType = Symbol("ChallengeType");
 
 export interface ChallengeOptions {
-    visibility?: Computable<Visibility>;
+    visibility?: Computable<Visibility | boolean>;
     canStart?: Computable<boolean>;
     reset?: GenericReset;
-    canComplete?: Computable<boolean | DecimalSource>;
+    requirements: Requirements;
+    maximize?: Computable<boolean>;
     completionLimit?: Computable<DecimalSource>;
     mark?: Computable<boolean | string>;
-    resource?: Resource;
-    goal?: Computable<DecimalSource>;
     classes?: Computable<Record<string, boolean>>;
     style?: Computable<StyleValue>;
     display?: Computable<
@@ -52,6 +59,7 @@ export interface ChallengeOptions {
 
 export interface BaseChallenge {
     id: string;
+    canComplete: Ref<DecimalSource>;
     completions: Persistent<DecimalSource>;
     completed: Ref<boolean>;
     maxed: Ref<boolean>;
@@ -68,10 +76,10 @@ export type Challenge<T extends ChallengeOptions> = Replace<
     {
         visibility: GetComputableTypeWithDefault<T["visibility"], Visibility.Visible>;
         canStart: GetComputableTypeWithDefault<T["canStart"], true>;
-        canComplete: GetComputableTypeWithDefault<T["canComplete"], Ref<boolean>>;
+        requirements: GetComputableType<T["requirements"]>;
+        maximize: GetComputableType<T["maximize"]>;
         completionLimit: GetComputableTypeWithDefault<T["completionLimit"], 1>;
         mark: GetComputableTypeWithDefault<T["mark"], Ref<boolean>>;
-        goal: GetComputableType<T["goal"]>;
         classes: GetComputableType<T["classes"]>;
         style: GetComputableType<T["style"]>;
         display: GetComputableType<T["display"]>;
@@ -81,9 +89,8 @@ export type Challenge<T extends ChallengeOptions> = Replace<
 export type GenericChallenge = Replace<
     Challenge<ChallengeOptions>,
     {
-        visibility: ProcessedComputable<Visibility>;
+        visibility: ProcessedComputable<Visibility | boolean>;
         canStart: ProcessedComputable<boolean>;
-        canComplete: ProcessedComputable<boolean | DecimalSource>;
         completionLimit: ProcessedComputable<DecimalSource>;
         mark: ProcessedComputable<boolean>;
     }
@@ -93,20 +100,9 @@ export function createChallenge<T extends ChallengeOptions>(
     optionsFunc: OptionsFunc<T, BaseChallenge, GenericChallenge>
 ): Challenge<T> {
     const completions = persistent(0);
-    const active = persistent(false);
+    const active = persistent(false, false);
     return createLazyProxy(() => {
         const challenge = optionsFunc();
-
-        if (
-            challenge.canComplete == null &&
-            (challenge.resource == null || challenge.goal == null)
-        ) {
-            console.warn(
-                "Cannot create challenge without a canComplete property or a resource and goal property",
-                challenge
-            );
-            throw "Cannot create challenge without a canComplete property or a resource and goal property";
-        }
 
         challenge.id = getUniqueID("challenge-");
         challenge.type = ChallengeType;
@@ -126,11 +122,11 @@ export function createChallenge<T extends ChallengeOptions>(
         challenge.toggle = function () {
             const genericChallenge = challenge as GenericChallenge;
             if (genericChallenge.active.value) {
-                if (unref(genericChallenge.canComplete) && !genericChallenge.maxed.value) {
-                    let completions: boolean | DecimalSource = unref(genericChallenge.canComplete);
-                    if (typeof completions === "boolean") {
-                        completions = 1;
-                    }
+                if (
+                    Decimal.gt(unref(genericChallenge.canComplete), 0) &&
+                    !genericChallenge.maxed.value
+                ) {
+                    const completions = unref(genericChallenge.canComplete);
                     genericChallenge.completions.value = Decimal.min(
                         Decimal.add(genericChallenge.completions.value, completions),
                         unref(genericChallenge.completionLimit)
@@ -142,7 +138,7 @@ export function createChallenge<T extends ChallengeOptions>(
                 genericChallenge.reset?.reset();
             } else if (
                 unref(genericChallenge.canStart) &&
-                unref(genericChallenge.visibility) === Visibility.Visible &&
+                isVisible(genericChallenge.visibility) &&
                 !genericChallenge.maxed.value
             ) {
                 genericChallenge.reset?.reset();
@@ -150,18 +146,20 @@ export function createChallenge<T extends ChallengeOptions>(
                 genericChallenge.onEnter?.();
             }
         };
+        challenge.canComplete = computed(() =>
+            Decimal.max(
+                maxRequirementsMet((challenge as GenericChallenge).requirements),
+                unref((challenge as GenericChallenge).maximize) ? Decimal.dInf : 1
+            )
+        );
         challenge.complete = function (remainInChallenge?: boolean) {
             const genericChallenge = challenge as GenericChallenge;
-            let completions: boolean | DecimalSource = unref(genericChallenge.canComplete);
+            const completions = unref(genericChallenge.canComplete);
             if (
                 genericChallenge.active.value &&
-                completions !== false &&
-                (completions === true || Decimal.neq(0, completions)) &&
+                Decimal.gt(completions, 0) &&
                 !genericChallenge.maxed.value
             ) {
-                if (typeof completions === "boolean") {
-                    completions = 1;
-                }
                 genericChallenge.completions.value = Decimal.min(
                     Decimal.add(genericChallenge.completions.value, completions),
                     unref(genericChallenge.completionLimit)
@@ -176,26 +174,13 @@ export function createChallenge<T extends ChallengeOptions>(
         };
         processComputable(challenge as T, "visibility");
         setDefault(challenge, "visibility", Visibility.Visible);
-        const visibility = challenge.visibility as ProcessedComputable<Visibility>;
+        const visibility = challenge.visibility as ProcessedComputable<Visibility | boolean>;
         challenge.visibility = computed(() => {
             if (settings.hideChallenges === true && unref(challenge.maxed)) {
                 return Visibility.None;
             }
             return unref(visibility);
         });
-        if (challenge.canComplete == null) {
-            challenge.canComplete = computed(() => {
-                const genericChallenge = challenge as GenericChallenge;
-                if (
-                    !genericChallenge.active.value ||
-                    genericChallenge.resource == null ||
-                    genericChallenge.goal == null
-                ) {
-                    return false;
-                }
-                return Decimal.gte(genericChallenge.resource.value, unref(genericChallenge.goal));
-            });
-        }
         if (challenge.mark == null) {
             challenge.mark = computed(
                 () =>
@@ -206,11 +191,10 @@ export function createChallenge<T extends ChallengeOptions>(
 
         processComputable(challenge as T, "canStart");
         setDefault(challenge, "canStart", true);
-        processComputable(challenge as T, "canComplete");
+        processComputable(challenge as T, "maximize");
         processComputable(challenge as T, "completionLimit");
         setDefault(challenge, "completionLimit", 1);
         processComputable(challenge as T, "mark");
-        processComputable(challenge as T, "goal");
         processComputable(challenge as T, "classes");
         processComputable(challenge as T, "style");
         processComputable(challenge as T, "display");
@@ -264,11 +248,14 @@ export function setupAutoComplete(
     exitOnComplete = true
 ): WatchStopHandle {
     const isActive = typeof autoActive === "function" ? computed(autoActive) : autoActive;
-    return watch([challenge.canComplete, isActive], ([canComplete, isActive]) => {
-        if (canComplete && isActive) {
-            challenge.complete(!exitOnComplete);
+    return watch(
+        [challenge.canComplete as Ref<DecimalSource>, isActive as Ref<boolean>],
+        ([canComplete, isActive]) => {
+            if (Decimal.gt(canComplete, 0) && isActive) {
+                challenge.complete(!exitOnComplete);
+            }
         }
-    });
+    );
 }
 
 export function createActiveChallenge(
@@ -299,7 +286,12 @@ globalBus.on("loadSettings", settings => {
 registerSettingField(
     jsx(() => (
         <Toggle
-            title="Hide Maxed Challenges"
+            title={jsx(() => (
+                <span class="option-title">
+                    Hide maxed challenges
+                    <desc>Hide challenges that have been fully completed.</desc>
+                </span>
+            ))}
             onUpdate:modelValue={value => (settings.hideChallenges = value)}
             modelValue={settings.hideChallenges}
         />

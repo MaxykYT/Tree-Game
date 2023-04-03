@@ -8,11 +8,13 @@
 </template>
 
 <script lang="tsx">
-import type { StyleValue } from "features/feature";
 import { Application } from "@pixi/app";
+import type { StyleValue } from "features/feature";
+import { globalBus } from "game/events";
+import "lib/pixi";
 import { processedPropType } from "util/vue";
 import type { PropType } from "vue";
-import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, unref } from "vue";
+import { defineComponent, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, unref } from "vue";
 
 // TODO get typing support on the Particles component
 export default defineComponent({
@@ -31,10 +33,10 @@ export default defineComponent({
         onHotReload: Function as PropType<VoidFunction>
     },
     setup(props) {
-        const app = ref<null | Application>(null);
+        const app = shallowRef<null | Application>(null);
 
         const resizeObserver = new ResizeObserver(updateBounds);
-        const resizeListener = ref<HTMLElement | null>(null);
+        const resizeListener = shallowRef<HTMLElement | null>(null);
 
         onMounted(() => {
             // ResizeListener exists because ResizeObserver's don't work when told to observe an SVG element
@@ -62,15 +64,14 @@ export default defineComponent({
             if (isDirty) {
                 isDirty = false;
                 nextTick(() => {
-                    if (resizeListener.value != null && props.onContainerResized) {
-                        props.onContainerResized(resizeListener.value.getBoundingClientRect());
-                        app.value?.resize();
+                    if (resizeListener.value != null) {
+                        props.onContainerResized?.(resizeListener.value.getBoundingClientRect());
                     }
                     isDirty = true;
                 });
             }
         }
-        document.fonts.ready.then(updateBounds);
+        globalBus.on("fontsLoaded", updateBounds);
 
         return {
             unref,

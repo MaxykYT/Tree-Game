@@ -1,8 +1,9 @@
 import "components/common/modifiers.css";
 import type { CoercableComponent } from "features/feature";
 import { jsx } from "features/feature";
+import settings from "game/settings";
 import type { DecimalSource } from "util/bignum";
-import Decimal, { format } from "util/bignum";
+import Decimal, { formatSmall } from "util/bignum";
 import type { WithRequired } from "util/common";
 import type { Computable, ProcessedComputable } from "util/computed";
 import { convertComputable } from "util/computed";
@@ -14,8 +15,7 @@ import { computed, unref } from "vue";
  * An object that can be used to apply or unapply some modification to a number.
  * Being reversible requires the operation being invertible, but some features may rely on that.
  * Descriptions can be optionally included for displaying them to the player.
- * The built-in modifier creators are designed to display the modifiers using.
- * {@link createModifierSection}.
+ * The built-in modifier creators are designed to display the modifiers using {@link createModifierSection}.
  */
 export interface Modifier {
     /** Applies some operation on the input and returns the result. */
@@ -46,29 +46,26 @@ export type ModifierFromOptionalParams<T, S> = T extends undefined
     : WithRequired<Modifier, "revert" | "enabled" | "description">;
 
 /** An object that configures an additive modifier via {@link createAdditiveModifier}. */
-export interface AdditiveModifierOptions<
-    T extends Computable<CoercableComponent> | undefined,
-    S extends Computable<boolean> | undefined
-> {
+export interface AdditiveModifierOptions {
     /** The amount to add to the input value. */
     addend: Computable<DecimalSource>;
     /** Description of what this modifier is doing. */
-    description?: T;
+    description?: Computable<CoercableComponent> | undefined;
     /** A computable that will be processed and passed directly into the returned modifier. */
-    enabled?: S;
+    enabled?: Computable<boolean> | undefined;
+    /** Determines if numbers larger or smaller than 0 should be displayed as red. */
+    smallerIsBetter?: boolean;
 }
 
 /**
  * Create a modifier that adds some value to the input value.
  * @param optionsFunc Additive modifier options.
  */
-export function createAdditiveModifier<
-    T extends Computable<CoercableComponent> | undefined,
-    S extends Computable<boolean> | undefined,
-    R = ModifierFromOptionalParams<T, S>
->(optionsFunc: () => AdditiveModifierOptions<T, S>): R {
+export function createAdditiveModifier<T extends AdditiveModifierOptions>(
+    optionsFunc: () => T
+): ModifierFromOptionalParams<T["description"], T["enabled"]> {
     return createLazyProxy(() => {
-        const { addend, description, enabled } = optionsFunc();
+        const { addend, description, enabled, smallerIsBetter } = optionsFunc();
 
         const processedAddend = convertComputable(addend);
         const processedDescription = convertComputable(description);
@@ -82,46 +79,54 @@ export function createAdditiveModifier<
                     ? undefined
                     : jsx(() => (
                           <div class="modifier-container">
-                              <span class="modifier-amount">
-                                  {Decimal.gte(unref(processedAddend), 0) ? "+" : ""}
-                                  {format(unref(processedAddend))}
-                              </span>
-                              {unref(processedDescription) ? (
+                              {unref(processedDescription) != null ? (
                                   <span class="modifier-description">
                                       {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion */}
                                       {renderJSX(unref(processedDescription)!)}
                                   </span>
                               ) : null}
+                              <span
+                                  class="modifier-amount"
+                                  style={
+                                      (
+                                          smallerIsBetter === true
+                                              ? Decimal.gt(unref(processedAddend), 0)
+                                              : Decimal.lt(unref(processedAddend), 0)
+                                      )
+                                          ? "color: var(--danger)"
+                                          : ""
+                                  }
+                              >
+                                  {Decimal.gte(unref(processedAddend), 0) ? "+" : ""}
+                                  {formatSmall(unref(processedAddend))}
+                              </span>
                           </div>
                       ))
         };
-    }) as unknown as R;
+    }) as unknown as ModifierFromOptionalParams<T["description"], T["enabled"]>;
 }
 
 /** An object that configures an multiplicative modifier via {@link createMultiplicativeModifier}. */
-export interface MultiplicativeModifierOptions<
-    T extends Computable<CoercableComponent> | undefined,
-    S extends Computable<boolean> | undefined
-> {
+export interface MultiplicativeModifierOptions {
     /** The amount to multiply the input value by. */
     multiplier: Computable<DecimalSource>;
     /** Description of what this modifier is doing. */
-    description?: T;
+    description?: Computable<CoercableComponent> | undefined;
     /** A computable that will be processed and passed directly into the returned modifier. */
-    enabled?: S;
+    enabled?: Computable<boolean> | undefined;
+    /** Determines if numbers larger or smaller than 1 should be displayed as red. */
+    smallerIsBetter?: boolean;
 }
 
 /**
  * Create a modifier that multiplies the input value by some value.
  * @param optionsFunc Multiplicative modifier options.
  */
-export function createMultiplicativeModifier<
-    T extends Computable<CoercableComponent> | undefined,
-    S extends Computable<boolean> | undefined,
-    R = ModifierFromOptionalParams<T, S>
->(optionsFunc: () => MultiplicativeModifierOptions<T, S>): R {
+export function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(
+    optionsFunc: () => T
+): ModifierFromOptionalParams<T["description"], T["enabled"]> {
     return createLazyProxy(() => {
-        const { multiplier, description, enabled } = optionsFunc();
+        const { multiplier, description, enabled, smallerIsBetter } = optionsFunc();
 
         const processedMultiplier = convertComputable(multiplier);
         const processedDescription = convertComputable(description);
@@ -135,71 +140,114 @@ export function createMultiplicativeModifier<
                     ? undefined
                     : jsx(() => (
                           <div class="modifier-container">
-                              <span class="modifier-amount">
-                                  x{format(unref(processedMultiplier))}
-                              </span>
-                              {unref(processedDescription) ? (
+                              {unref(processedDescription) != null ? (
                                   <span class="modifier-description">
                                       {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion */}
                                       {renderJSX(unref(processedDescription)!)}
                                   </span>
                               ) : null}
+                              <span
+                                  class="modifier-amount"
+                                  style={
+                                      (
+                                          smallerIsBetter === true
+                                              ? Decimal.gt(unref(processedMultiplier), 1)
+                                              : Decimal.lt(unref(processedMultiplier), 1)
+                                      )
+                                          ? "color: var(--danger)"
+                                          : ""
+                                  }
+                              >
+                                  ×{formatSmall(unref(processedMultiplier))}
+                              </span>
                           </div>
                       ))
         };
-    }) as unknown as R;
+    }) as unknown as ModifierFromOptionalParams<T["description"], T["enabled"]>;
 }
 
 /** An object that configures an exponential modifier via {@link createExponentialModifier}. */
-export interface ExponentialModifierOptions<
-    T extends Computable<CoercableComponent> | undefined,
-    S extends Computable<boolean> | undefined
-> {
+export interface ExponentialModifierOptions {
     /** The amount to raise the input value to the power of. */
     exponent: Computable<DecimalSource>;
     /** Description of what this modifier is doing. */
-    description?: T;
+    description?: Computable<CoercableComponent> | undefined;
     /** A computable that will be processed and passed directly into the returned modifier. */
-    enabled?: S;
+    enabled?: Computable<boolean> | undefined;
+    /** Add 1 before calculating, then remove it afterwards. This prevents low numbers from becoming lower. */
+    supportLowNumbers?: boolean;
+    /** Determines if numbers larger or smaller than 1 should be displayed as red. */
+    smallerIsBetter?: boolean;
 }
 
 /**
  * Create a modifier that raises the input value to the power of some value.
  * @param optionsFunc Exponential modifier options.
  */
-export function createExponentialModifier<
-    T extends Computable<CoercableComponent> | undefined,
-    S extends Computable<boolean> | undefined,
-    R = ModifierFromOptionalParams<T, S>
->(optionsFunc: () => ExponentialModifierOptions<T, S>): R {
+export function createExponentialModifier<T extends ExponentialModifierOptions>(
+    optionsFunc: () => T
+): ModifierFromOptionalParams<T["description"], T["enabled"]> {
     return createLazyProxy(() => {
-        const { exponent, description, enabled } = optionsFunc();
+        const { exponent, description, enabled, supportLowNumbers, smallerIsBetter } =
+            optionsFunc();
 
         const processedExponent = convertComputable(exponent);
         const processedDescription = convertComputable(description);
         const processedEnabled = enabled == null ? undefined : convertComputable(enabled);
         return {
-            apply: (gain: DecimalSource) => Decimal.pow(gain, unref(processedExponent)),
-            revert: (gain: DecimalSource) => Decimal.root(gain, unref(processedExponent)),
+            apply: (gain: DecimalSource) => {
+                let result = gain;
+                if (supportLowNumbers) {
+                    result = Decimal.add(result, 1);
+                }
+                result = Decimal.pow(result, unref(processedExponent));
+                if (supportLowNumbers) {
+                    result = Decimal.sub(result, 1);
+                }
+                return result;
+            },
+            revert: (gain: DecimalSource) => {
+                let result = gain;
+                if (supportLowNumbers) {
+                    result = Decimal.add(result, 1);
+                }
+                result = Decimal.root(result, unref(processedExponent));
+                if (supportLowNumbers) {
+                    result = Decimal.sub(result, 1);
+                }
+                return result;
+            },
             enabled: processedEnabled,
             description:
                 description == null
                     ? undefined
                     : jsx(() => (
                           <div class="modifier-container">
-                              <span class="modifier-amount">
-                                  ^{format(unref(processedExponent))}
-                              </span>
-                              {unref(processedDescription) ? (
+                              {unref(processedDescription) != null ? (
                                   <span class="modifier-description">
                                       {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion */}
                                       {renderJSX(unref(processedDescription)!)}
+                                      {supportLowNumbers ? " (+1 effective)" : null}
                                   </span>
                               ) : null}
+                              <span
+                                  class="modifier-amount"
+                                  style={
+                                      (
+                                          smallerIsBetter === true
+                                              ? Decimal.gt(unref(processedExponent), 1)
+                                              : Decimal.lt(unref(processedExponent), 1)
+                                      )
+                                          ? "color: var(--danger)"
+                                          : ""
+                                  }
+                              >
+                                  ^{formatSmall(unref(processedExponent))}
+                              </span>
                           </div>
                       ))
         };
-    }) as unknown as R;
+    }) as unknown as ModifierFromOptionalParams<T["description"], T["enabled"]>;
 }
 
 /**
@@ -248,39 +296,52 @@ export function createSequentialModifier<
 /**
  * Create a JSX element that displays a modifier.
  * Intended to be used with the output from {@link createSequentialModifier}.
- * @param title The header for the section.
- * @param subtitle Smaller text that appears in the header after the title.
- * @param modifier The modifier to render.
- * @param base The base value that'll be passed into the modifier.
- * @param unit The unit of the value being modified, if any.
- * @param baseText The label to use for the base value.
+ * @param options Modifier section options.
  */
-export function createModifierSection(
-    title: string,
-    subtitle: string,
-    modifier: WithRequired<Modifier, "description">,
-    base: DecimalSource = 1,
-    unit = "",
-    baseText: CoercableComponent = "Base"
-) {
+export function createModifierSection({
+    title,
+    subtitle,
+    modifier,
+    base,
+    unit,
+    baseText,
+    smallerIsBetter
+}: ModifierSectionOptions) {
+    const total = modifier.apply(base ?? 1);
     return (
-        <div>
+        <div style={{ "--unit": settings.alignUnits && unit != null ? "'" + unit + "'" : "" }}>
             <h3>
                 {title}
-                {subtitle ? <span class="subtitle"> ({subtitle})</span> : null}
+                {subtitle == null ? null : <span class="subtitle"> ({subtitle})</span>}
             </h3>
             <br />
             <div class="modifier-container">
+                <span class="modifier-description">{renderJSX(baseText ?? "Base")}</span>
                 <span class="modifier-amount">
-                    {format(base)}
+                    {formatSmall(base ?? 1)}
                     {unit}
                 </span>
-                <span class="modifier-description">{renderJSX(baseText)}</span>
             </div>
             {renderJSX(unref(modifier.description))}
             <hr />
-            Total: {format(modifier.apply(base))}
-            {unit}
+            <div class="modifier-container">
+                <span class="modifier-description">Total</span>
+                <span
+                    class="modifier-amount"
+                    style={
+                        (
+                            smallerIsBetter === true
+                                ? Decimal.gt(total, base ?? 1)
+                                : Decimal.lt(total, base ?? 1)
+                        )
+                            ? "color: var(--danger)"
+                            : ""
+                    }
+                >
+                    {formatSmall(total)}
+                    {unit}
+                </span>
+            </div>
         </div>
     );
 }

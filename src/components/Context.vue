@@ -12,6 +12,7 @@ import {
 } from "game/layers";
 import type { FeatureNode } from "game/layers";
 import { nextTick, onMounted, provide, ref } from "vue";
+import { globalBus } from "game/events";
 
 const emit = defineEmits<{
     (e: "updateNodes", nodes: Record<string, FeatureNode | undefined>): void;
@@ -31,7 +32,7 @@ onMounted(() => {
 let isDirty = true;
 let boundingRect = ref(resizeListener.value?.getBoundingClientRect());
 function updateBounds() {
-    if (resizeListener.value != null && isDirty) {
+    if (isDirty) {
         isDirty = false;
         nextTick(() => {
             boundingRect.value = resizeListener.value?.getBoundingClientRect();
@@ -43,7 +44,7 @@ function updateBounds() {
         });
     }
 }
-document.fonts.ready.then(updateBounds);
+globalBus.on("fontsLoaded", updateBounds);
 
 const observerOptions = {
     attributes: false,
@@ -55,13 +56,12 @@ provide(RegisterNodeInjectionKey, (id, element) => {
     const observer = new MutationObserver(() => updateNode(id));
     observer.observe(element, observerOptions);
     nodes.value[id] = { element, observer, rect: element.getBoundingClientRect() };
-    emit("updateNodes", nodes.value);
-    nextTick(() => updateNode(id));
+    updateBounds();
 });
 provide(UnregisterNodeInjectionKey, id => {
     nodes.value[id]?.observer.disconnect();
     nodes.value[id] = undefined;
-    emit("updateNodes", nodes.value);
+    updateBounds();
 });
 provide(NodesInjectionKey, nodes);
 provide(BoundsInjectionKey, boundingRect);

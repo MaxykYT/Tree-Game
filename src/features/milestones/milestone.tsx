@@ -1,6 +1,20 @@
 import Select from "components/fields/Select.vue";
-import type { CoercableComponent, OptionsFunc, Replace, StyleValue } from "features/feature";
-import { Component, GatherProps, getUniqueID, jsx, setDefault, Visibility } from "features/feature";
+import type {
+    CoercableComponent,
+    GenericComponent,
+    OptionsFunc,
+    Replace,
+    StyleValue
+} from "features/feature";
+import {
+    Component,
+    GatherProps,
+    getUniqueID,
+    isVisible,
+    jsx,
+    setDefault,
+    Visibility
+} from "features/feature";
 import MilestoneComponent from "features/milestones/Milestone.vue";
 import { globalBus } from "game/events";
 import "game/notifications";
@@ -34,7 +48,7 @@ export enum MilestoneDisplay {
 }
 
 export interface MilestoneOptions {
-    visibility?: Computable<Visibility>;
+    visibility?: Computable<Visibility | boolean>;
     shouldEarn?: () => boolean;
     style?: Computable<StyleValue>;
     classes?: Computable<Record<string, boolean>>;
@@ -46,6 +60,7 @@ export interface MilestoneOptions {
               optionsDisplay?: CoercableComponent;
           }
     >;
+    showPopups?: Computable<boolean>;
     onComplete?: VoidFunction;
 }
 
@@ -65,20 +80,21 @@ export type Milestone<T extends MilestoneOptions> = Replace<
         style: GetComputableType<T["style"]>;
         classes: GetComputableType<T["classes"]>;
         display: GetComputableType<T["display"]>;
+        showPopups: GetComputableType<T["showPopups"]>;
     }
 >;
 
 export type GenericMilestone = Replace<
     Milestone<MilestoneOptions>,
     {
-        visibility: ProcessedComputable<Visibility>;
+        visibility: ProcessedComputable<Visibility | boolean>;
     }
 >;
 
 export function createMilestone<T extends MilestoneOptions>(
     optionsFunc?: OptionsFunc<T, BaseMilestone, GenericMilestone>
 ): Milestone<T> {
-    const earned = persistent<boolean>(false);
+    const earned = persistent<boolean>(false, false);
     return createLazyProxy(() => {
         const milestone = optionsFunc?.() ?? ({} as ReturnType<NonNullable<typeof optionsFunc>>);
         milestone.id = getUniqueID("milestone-");
@@ -87,12 +103,30 @@ export function createMilestone<T extends MilestoneOptions>(
 
         milestone.earned = earned;
         milestone.complete = function () {
+            const genericMilestone = milestone as GenericMilestone;
             earned.value = true;
+            genericMilestone.onComplete?.();
+            if (genericMilestone.display != null && unref(genericMilestone.showPopups) === true) {
+                const display = unref(genericMilestone.display);
+                const Display = coerceComponent(
+                    isCoercableComponent(display) ? display : display.requirement
+                );
+                toast(
+                    <>
+                        <h3>Milestone earned!</h3>
+                        <div>
+                            {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                            {/* @ts-ignore */}
+                            <Display />
+                        </div>
+                    </>
+                );
+            }
         };
 
         processComputable(milestone as T, "visibility");
         setDefault(milestone, "visibility", Visibility.Visible);
-        const visibility = milestone.visibility as ProcessedComputable<Visibility>;
+        const visibility = milestone.visibility as ProcessedComputable<Visibility | boolean>;
         milestone.visibility = computed(() => {
             const display = unref((milestone as GenericMilestone).display);
             switch (settings.msDisplay) {
@@ -124,6 +158,7 @@ export function createMilestone<T extends MilestoneOptions>(
         processComputable(milestone as T, "style");
         processComputable(milestone as T, "classes");
         processComputable(milestone as T, "display");
+        processComputable(milestone as T, "showPopups");
 
         milestone[GatherProps] = function (this: GenericMilestone) {
             const { visibility, display, style, classes, earned, id } = this;
@@ -136,12 +171,15 @@ export function createMilestone<T extends MilestoneOptions>(
                 if (settings.active !== player.id) return;
                 if (
                     !genericMilestone.earned.value &&
-                    unref(genericMilestone.visibility) === Visibility.Visible &&
+                    isVisible(genericMilestone.visibility) &&
                     genericMilestone.shouldEarn?.()
                 ) {
                     genericMilestone.earned.value = true;
                     genericMilestone.onComplete?.();
-                    if (genericMilestone.display) {
+                    if (
+                        genericMilestone.display != null &&
+                        unref(genericMilestone.showPopups) === true
+                    ) {
                         const display = unref(genericMilestone.display);
                         const Display = coerceComponent(
                             isCoercableComponent(display) ? display : display.requirement
@@ -183,7 +221,12 @@ const msDisplayOptions = Object.values(MilestoneDisplay).map(option => ({
 registerSettingField(
     jsx(() => (
         <Select
-            title="Show Milestones"
+            title={jsx(() => (
+                <span class="option-title">
+                    Show milestones
+                    <desc>Select which milestones to display based on criterias.</desc>
+                </span>
+            ))}
             options={msDisplayOptions}
             onUpdate:modelValue={value => (settings.msDisplay = value as MilestoneDisplay)}
             modelValue={settings.msDisplay}

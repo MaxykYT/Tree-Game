@@ -1,9 +1,9 @@
 <template>
     <div
-        v-if="unref(visibility) !== Visibility.None"
+        v-if="isVisible(visibility)"
         :style="[
             {
-                visibility: unref(visibility) === Visibility.Hidden ? 'hidden' : undefined
+                visibility: isHidden(visibility) ? 'hidden' : undefined
             },
             unref(style) ?? {}
         ]"
@@ -18,7 +18,7 @@
 import "components/common/features.css";
 import Node from "components/Node.vue";
 import type { StyleValue } from "features/feature";
-import { jsx, Visibility } from "features/feature";
+import { isHidden, isVisible, jsx, Visibility } from "features/feature";
 import type { GenericMilestone } from "features/milestones/milestone";
 import { coerceComponent, isCoercableComponent, processedPropType, unwrapRef } from "util/vue";
 import type { Component, UnwrapRef } from "vue";
@@ -27,7 +27,7 @@ import { defineComponent, shallowRef, toRefs, unref, watchEffect } from "vue";
 export default defineComponent({
     props: {
         visibility: {
-            type: processedPropType<Visibility>(Number),
+            type: processedPropType<Visibility | boolean>(Number, Boolean),
             required: true
         },
         display: {
@@ -74,12 +74,12 @@ export default defineComponent({
                 jsx(() => (
                     <span>
                         <Requirement />
-                        {currDisplay.effectDisplay ? (
+                        {currDisplay.effectDisplay != null ? (
                             <div>
                                 <EffectDisplay />
                             </div>
                         ) : null}
-                        {currDisplay.optionsDisplay ? (
+                        {currDisplay.optionsDisplay != null ? (
                             <div class="equal-spaced">
                                 <OptionsDisplay />
                             </div>
@@ -92,7 +92,9 @@ export default defineComponent({
         return {
             comp,
             unref,
-            Visibility
+            Visibility,
+            isVisible,
+            isHidden
         };
     }
 });

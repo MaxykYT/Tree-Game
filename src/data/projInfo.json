@@ -1,4 +1,6 @@
 {
+	"$schema": "./projInfo-schema.json",
+
 	"title": "Profectus Demo",
 	"description": "A demo project made in Profectus",
 	"id": "profectus-demo",

@@ -1,7 +1,13 @@
 import Col from "components/layout/Column.vue";
 import Row from "components/layout/Row.vue";
 import type { CoercableComponent, GenericComponent, JSXFunction } from "features/feature";
-import { Component as ComponentKey, GatherProps, jsx, Visibility } from "features/feature";
+import {
+    Component as ComponentKey,
+    GatherProps,
+    isVisible,
+    jsx,
+    Visibility
+} from "features/feature";
 import type { ProcessedComputable } from "util/computed";
 import { DoNotCache } from "util/computed";
 import type { Component, ComputedRef, DefineComponent, PropType, Ref, ShallowRef } from "vue";
@@ -37,10 +43,10 @@ export function coerceComponent(
     return component;
 }
 
-export type VueFeature = {
+export interface VueFeature {
     [ComponentKey]: GenericComponent;
     [GatherProps]: () => Record<string, unknown>;
-};
+}
 
 export function render(object: VueFeature | CoercableComponent): JSX.Element | DefineComponent {
     if (isCoercableComponent(object)) {
@@ -83,6 +89,16 @@ export function renderRowJSX(...objects: (VueFeature | CoercableComponent)[]): J
 
 export function renderColJSX(...objects: (VueFeature | CoercableComponent)[]): JSX.Element {
     return <Col>{objects.map(renderJSX)}</Col>;
+}
+
+export function joinJSX(objects: JSX.Element[], joiner: JSX.Element): JSX.Element {
+    return objects.reduce((acc, curr) => (
+        <>
+            {acc}
+            {joiner}
+            {curr}
+        </>
+    ));
 }
 
 export function isCoercableComponent(component: unknown): component is CoercableComponent {
@@ -137,7 +153,7 @@ export function setupHoldToClick(
 }
 
 export function getFirstFeature<
-    T extends VueFeature & { visibility: ProcessedComputable<Visibility> }
+    T extends VueFeature & { visibility: ProcessedComputable<Visibility | boolean> }
 >(
     features: T[],
     filter: (feature: T) => boolean
@@ -147,9 +163,7 @@ export function getFirstFeature<
     hasCollapsedContent: Ref<boolean>;
 } {
     const filteredFeatures = computed(() =>
-        features.filter(
-            feature => unref(feature.visibility) === Visibility.Visible && filter(feature)
-        )
+        features.filter(feature => isVisible(feature.visibility) && filter(feature))
     );
     return {
         firstFeature: computed(() => filteredFeatures.value[0]),
@@ -175,7 +189,10 @@ export function computeOptionalComponent(
     const comp = shallowRef<Component | "" | null>(null);
     watchEffect(() => {
         const currComponent = unwrapRef(component);
-        comp.value = currComponent == null ? null : coerceComponent(currComponent, defaultWrapper);
+        comp.value =
+            currComponent == "" || currComponent == null
+                ? null
+                : coerceComponent(currComponent, defaultWrapper);
     });
     return comp;
 }
@@ -210,4 +227,17 @@ export function processedPropType<T>(...types: PropTypes[]): PropType<ProcessedC
         types.push(Object);
     }
     return types as PropType<ProcessedComputable<T>>;
+}
+
+export function trackHover(element: VueFeature): Ref<boolean> {
+    const isHovered = ref(false);
+
+    const elementGatherProps = element[GatherProps].bind(element);
+    element[GatherProps] = () => ({
+        ...elementGatherProps(),
+        onPointerenter: () => (isHovered.value = true),
+        onPointerleave: () => (isHovered.value = false)
+    });
+
+    return isHovered;
 }

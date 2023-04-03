@@ -16,7 +16,7 @@ import { unref } from "vue";
 export const InfoboxType = Symbol("Infobox");
 
 export interface InfoboxOptions {
-    visibility?: Computable<Visibility>;
+    visibility?: Computable<Visibility | boolean>;
     color?: Computable<string>;
     style?: Computable<StyleValue>;
     titleStyle?: Computable<StyleValue>;
@@ -51,14 +51,14 @@ export type Infobox<T extends InfoboxOptions> = Replace<
 export type GenericInfobox = Replace<
     Infobox<InfoboxOptions>,
     {
-        visibility: ProcessedComputable<Visibility>;
+        visibility: ProcessedComputable<Visibility | boolean>;
     }
 >;
 
 export function createInfobox<T extends InfoboxOptions>(
     optionsFunc: OptionsFunc<T, BaseInfobox, GenericInfobox>
 ): Infobox<T> {
-    const collapsed = persistent<boolean>(false);
+    const collapsed = persistent<boolean>(false, false);
     return createLazyProxy(() => {
         const infobox = optionsFunc();
         infobox.id = getUniqueID("infobox-");

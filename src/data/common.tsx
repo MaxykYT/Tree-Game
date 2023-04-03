@@ -1,17 +1,22 @@
+import Collapsible from "components/layout/Collapsible.vue";
 import type { Clickable, ClickableOptions, GenericClickable } from "features/clickables/clickable";
 import { createClickable } from "features/clickables/clickable";
 import type { GenericConversion } from "features/conversion";
 import type { CoercableComponent, JSXFunction, OptionsFunc, Replace } from "features/feature";
 import { jsx, setDefault } from "features/feature";
-import { displayResource } from "features/resources/resource";
+import { GenericMilestone } from "features/milestones/milestone";
+import { displayResource, Resource } from "features/resources/resource";
 import type { GenericTree, GenericTreeNode, TreeNode, TreeNodeOptions } from "features/trees/tree";
 import { createTreeNode } from "features/trees/tree";
+import Formula from "game/formulas/formulas";
+import type { FormulaSource, GenericFormula } from "game/formulas/types";
 import type { Modifier } from "game/modifiers";
 import type { Persistent } from "game/persistence";
 import { DefaultValue, persistent } from "game/persistence";
 import player from "game/player";
+import settings from "game/settings";
 import type { DecimalSource } from "util/bignum";
-import Decimal, { format } from "util/bignum";
+import Decimal, { format, formatSmall, formatTime } from "util/bignum";
 import type { WithRequired } from "util/common";
 import type {
     Computable,
@@ -20,9 +25,8 @@ import type {
     ProcessedComputable
 } from "util/computed";
 import { convertComputable, processComputable } from "util/computed";
-import { createLazyProxy } from "util/proxies";
-import { renderJSX } from "util/vue";
-import type { Ref } from "vue";
+import { getFirstFeature, renderColJSX, renderJSX } from "util/vue";
+import type { ComputedRef, Ref } from "vue";
 import { computed, unref } from "vue";
 import "./common.css";
 
@@ -72,7 +76,7 @@ export type ResetButton<T extends ResetButtonOptions> = Replace<
         display: GetComputableTypeWithDefault<T["display"], Ref<JSX.Element>>;
         canClick: GetComputableTypeWithDefault<T["canClick"], Ref<boolean>>;
         minimumGain: GetComputableTypeWithDefault<T["minimumGain"], 1>;
-        onClick: VoidFunction;
+        onClick: (event?: MouseEvent | TouchEvent) => void;
     }
 >;
 
@@ -124,7 +128,7 @@ export function createResetButton<T extends ClickableOptions & ResetButtonOption
                         )}
                     </b>{" "}
                     {resetButton.conversion.gainResource.displayName}
-                    {unref(resetButton.showNextAt) ? (
+                    {unref(resetButton.showNextAt) != null ? (
                         <div>
                             <br />
                             {unref(resetButton.conversion.buyMax) ? "Next:" : "Req:"}{" "}
@@ -152,8 +156,8 @@ export function createResetButton<T extends ClickableOptions & ResetButtonOption
         }
 
         const onClick = resetButton.onClick;
-        resetButton.onClick = function () {
-            if (!unref(resetButton.canClick)) {
+        resetButton.onClick = function (event?: MouseEvent | TouchEvent) {
+            if (unref(resetButton.canClick) === false) {
                 return;
             }
             resetButton.conversion.convert();
@@ -161,7 +165,7 @@ export function createResetButton<T extends ClickableOptions & ResetButtonOption
             if (resetButton.resetTime) {
                 resetButton.resetTime.value = resetButton.resetTime[DefaultValue];
             }
-            onClick?.();
+            onClick?.(event);
         };
 
         return resetButton;
@@ -236,9 +240,9 @@ export function createLayerTreeNode<T extends LayerTreeNodeOptions>(
 /** An option object for a modifier display as a single section. **/
 export interface Section {
     /** The header for this modifier. **/
-    title: string;
+    title: Computable<string>;
     /** A subtitle for this modifier, e.g. to explain the context for the modifier. **/
-    subtitle?: string;
+    subtitle?: Computable<string>;
     /** The modifier to be displaying in this section. **/
     modifier: WithRequired<Modifier, "description">;
     /** The base value being modified. **/
@@ -255,66 +259,119 @@ export interface Section {
  * Takes an array of modifier "sections", and creates a JSXFunction that can render all those sections, and allow each section to be collapsed.
  * Also returns a list of persistent refs that are used to control which sections are currently collapsed.
  * @param sectionsFunc A function that returns the sections to display.
+ * @param smallerIsBetter Determines whether numbers larger or smaller than the base should be displayed as red.
  */
 export function createCollapsibleModifierSections(
-    sectionsFunc: () => Section[]
-): [JSXFunction, Persistent<boolean>[]] {
-    return createLazyProxy(() => {
-        const sections = sectionsFunc();
+    sectionsFunc: () => Section[],
+    smallerIsBetter = false
+): [JSXFunction, Persistent<Record<number, boolean>>] {
+    const sections: Section[] = [];
+    const processed:
+        | {
+              base: ProcessedComputable<DecimalSource | undefined>[];
+              baseText: ProcessedComputable<CoercableComponent | undefined>[];
+              visible: ProcessedComputable<boolean | undefined>[];
+              title: ProcessedComputable<string | undefined>[];
+              subtitle: ProcessedComputable<string | undefined>[];
+          }
+        | Record<string, never> = {};
+    let calculated = false;
+    function calculateSections() {
+        if (!calculated) {
+            sections.push(...sectionsFunc());
+            processed.base = sections.map(s => convertComputable(s.base));
+            processed.baseText = sections.map(s => convertComputable(s.baseText));
+            processed.visible = sections.map(s => convertComputable(s.visible));
+            processed.title = sections.map(s => convertComputable(s.title));
+            processed.subtitle = sections.map(s => convertComputable(s.subtitle));
+            calculated = true;
+        }
+        return sections;
+    }
 
-        const processedBase = sections.map(s => convertComputable(s.base));
-        const processedBaseText = sections.map(s => convertComputable(s.baseText));
-        const processedVisible = sections.map(s => convertComputable(s.visible));
-        const collapsed = sections.map(() => persistent<boolean>(false));
-        const jsxFunc = jsx(() => {
-            const sectionJSX = sections.map((s, i) => {
-                if (unref(processedVisible[i]) === false) return null;
-                const header = (
-                    <h3
-                        onClick={() => (collapsed[i].value = !collapsed[i].value)}
-                        style="cursor: pointer"
+    const collapsed = persistent<Record<number, boolean>>({}, false);
+    const jsxFunc = jsx(() => {
+        const sections = calculateSections();
+
+        let firstVisibleSection = true;
+        const sectionJSX = sections.map((s, i) => {
+            if (unref(processed.visible[i]) === false) return null;
+            const header = (
+                <h3
+                    onClick={() => (collapsed.value[i] = !collapsed.value[i])}
+                    style="cursor: pointer"
+                >
+                    <span
+                        class={"modifier-toggle" + (unref(collapsed.value[i]) ? " collapsed" : "")}
                     >
-                        <span class={"modifier-toggle" + (unref(collapsed[i]) ? " collapsed" : "")}>
-                            ▼
-                        </span>
-                        {s.title}
-                        {s.subtitle ? <span class="subtitle"> ({s.subtitle})</span> : null}
-                    </h3>
-                );
+                        ▼
+                    </span>
+                    {unref(processed.title[i])}
+                    {unref(processed.subtitle[i]) != null ? (
+                        <span class="subtitle"> ({unref(processed.subtitle[i])})</span>
+                    ) : null}
+                </h3>
+            );
 
-                const modifiers = unref(collapsed[i]) ? null : (
-                    <>
+            const modifiers = unref(collapsed.value[i]) ? null : (
+                <>
+                    <div class="modifier-container">
+                        <span class="modifier-description">
+                            {renderJSX(unref(processed.baseText[i]) ?? "Base")}
+                        </span>
+                        <span class="modifier-amount">
+                            {format(unref(processed.base[i]) ?? 1)}
+                            {s.unit}
+                        </span>
+                    </div>
+                    {renderJSX(unref(s.modifier.description))}
+                </>
+            );
+
+            const hasPreviousSection = !firstVisibleSection;
+            firstVisibleSection = false;
+
+            const base = unref(processed.base[i]) ?? 1;
+            const total = s.modifier.apply(base);
+
+            return (
+                <>
+                    {hasPreviousSection ? <br /> : null}
+                    <div
+                        style={{
+                            "--unit":
+                                settings.alignUnits && s.unit != null ? "'" + s.unit + "'" : ""
+                        }}
+                    >
+                        {header}
+                        <br />
+                        {modifiers}
+                        <hr />
                         <div class="modifier-container">
-                            <span class="modifier-amount">
-                                {format(unref(processedBase[i]) ?? 1)}
+                            <span class="modifier-description">Total</span>
+                            <span
+                                class="modifier-amount"
+                                style={
+                                    (
+                                        smallerIsBetter === true
+                                            ? Decimal.gt(total, base ?? 1)
+                                            : Decimal.lt(total, base ?? 1)
+                                    )
+                                        ? "color: var(--danger)"
+                                        : ""
+                                }
+                            >
+                                {formatSmall(total)}
                                 {s.unit}
                             </span>
-                            <span class="modifier-description">
-                                {renderJSX(unref(processedBaseText[i]) ?? "Base")}
-                            </span>
                         </div>
-                        {renderJSX(unref(s.modifier.description))}
-                    </>
-                );
-
-                return (
-                    <>
-                        {i === 0 ? null : <br />}
-                        <div>
-                            {header}
-                            <br />
-                            {modifiers}
-                            <hr />
-                            Total: {format(s.modifier.apply(unref(processedBase[i]) ?? 1))}
-                            {s.unit}
-                        </div>
-                    </>
-                );
-            });
-            return <>{sectionJSX}</>;
+                    </div>
+                </>
+            );
         });
-        return [jsxFunc, collapsed];
+        return <>{sectionJSX}</>;
     });
+    return [jsxFunc, collapsed];
 }
 
 /**
@@ -323,5 +380,135 @@ export function createCollapsibleModifierSections(
  * @param color The color to change the content to look like. Defaults to the current theme's accent 2 variable.
  */
 export function colorText(textToColor: string, color = "var(--accent2)"): JSX.Element {
-    return <span style={{ color }}>${textToColor}</span>;
+    return <span style={{ color }}>{textToColor}</span>;
+}
+
+/**
+ * Creates a collapsible display of a list of milestones
+ * @param milestones A dictionary of the milestones to display, inserted in the order from easiest to hardest
+ */
+export function createCollapsibleMilestones(milestones: Record<string, GenericMilestone>) {
+    // Milestones are typically defined from easiest to hardest, and we want to show hardest first
+    const orderedMilestones = Object.values(milestones).reverse();
+    const collapseMilestones = persistent<boolean>(true, false);
+    const lockedMilestones = computed(() =>
+        orderedMilestones.filter(m => m.earned.value === false)
+    );
+    const { firstFeature, collapsedContent, hasCollapsedContent } = getFirstFeature(
+        orderedMilestones,
+        m => m.earned.value
+    );
+    const display = jsx(() => {
+        const milestonesToDisplay = [...lockedMilestones.value];
+        if (firstFeature.value) {
+            milestonesToDisplay.push(firstFeature.value);
+        }
+        return renderColJSX(
+            ...milestonesToDisplay,
+            jsx(() => (
+                <Collapsible
+                    collapsed={collapseMilestones}
+                    content={collapsedContent}
+                    display={
+                        collapseMilestones.value
+                            ? "Show other completed milestones"
+                            : "Hide other completed milestones"
+                    }
+                    v-show={unref(hasCollapsedContent)}
+                />
+            ))
+        );
+    });
+    return {
+        collapseMilestones,
+        display
+    };
+}
+
+/**
+ * Utility function for getting an ETA for when a target will be reached by a resource with a known (and assumed consistent) gain.
+ * @param resource The resource that will be increasing over time.
+ * @param rate The rate at which the resource is increasing.
+ * @param target The target amount of the resource to estimate the duration until.
+ */
+export function estimateTime(
+    resource: Resource,
+    rate: Computable<DecimalSource>,
+    target: Computable<DecimalSource>
+) {
+    const processedRate = convertComputable(rate);
+    const processedTarget = convertComputable(target);
+    return computed(() => {
+        const currRate = unref(processedRate);
+        const currTarget = unref(processedTarget);
+        if (Decimal.gte(resource.value, currTarget)) {
+            return "Now";
+        } else if (Decimal.lt(currRate, 0)) {
+            return "Never";
+        }
+        return formatTime(Decimal.sub(currTarget, resource.value).div(currRate));
+    });
+}
+
+/**
+ * Utility function for displaying the result of a formula such that it will, when told to, preview how the formula's result will change.
+ * Requires a formula with a single variable inside.
+ * @param formula The formula to display the result of.
+ * @param showPreview Whether or not to preview how the formula's result will change.
+ * @param previewAmount The amount to _add_ to the current formula's variable amount to preview the change in result.
+ */
+export function createFormulaPreview(
+    formula: GenericFormula,
+    showPreview: Computable<boolean>,
+    previewAmount: Computable<DecimalSource> = 1
+): ComputedRef<CoercableComponent> {
+    const processedShowPreview = convertComputable(showPreview);
+    const processedPreviewAmount = convertComputable(previewAmount);
+    if (!formula.hasVariable()) {
+        throw new Error("Cannot create formula preview if the formula does not have a variable");
+    }
+    return computed(() => {
+        if (unref(processedShowPreview)) {
+            const curr = formatSmall(formula.evaluate());
+            const preview = formatSmall(
+                formula.evaluate(
+                    Decimal.add(
+                        unref(formula.innermostVariable ?? 0),
+                        unref(processedPreviewAmount)
+                    )
+                )
+            );
+            return jsx(() => (
+                <>
+                    <b>
+                        <i>
+                            {curr}→{preview}
+                        </i>
+                    </b>
+                </>
+            ));
+        }
+        return formatSmall(formula.evaluate());
+    });
+}
+
+export function modifierToFormula<T extends GenericFormula>(
+    modifier: WithRequired<Modifier, "revert">,
+    base: T
+): T;
+export function modifierToFormula(modifier: Modifier, base: FormulaSource): GenericFormula;
+export function modifierToFormula(modifier: Modifier, base: FormulaSource) {
+    return new Formula({
+        inputs: [base],
+        evaluate: val => modifier.apply(val),
+        invert:
+            "revert" in modifier && modifier.revert != null
+                ? (val, lhs) => {
+                      if (lhs instanceof Formula && lhs.hasVariable()) {
+                          return lhs.invert(modifier.revert!(val));
+                      }
+                      throw new Error("Could not invert due to no input being a variable");
+                  }
+                : undefined
+    });
 }

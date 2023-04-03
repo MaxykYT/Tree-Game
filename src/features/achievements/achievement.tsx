@@ -4,6 +4,7 @@ import {
     Component,
     GatherProps,
     getUniqueID,
+    isVisible,
     OptionsFunc,
     Replace,
     setDefault,
@@ -32,7 +33,7 @@ const toast = useToast();
 export const AchievementType = Symbol("Achievement");
 
 export interface AchievementOptions {
-    visibility?: Computable<Visibility>;
+    visibility?: Computable<Visibility | boolean>;
     shouldEarn?: () => boolean;
     display?: Computable<CoercableComponent>;
     mark?: Computable<boolean | string>;
@@ -66,14 +67,14 @@ export type Achievement<T extends AchievementOptions> = Replace<
 export type GenericAchievement = Replace<
     Achievement<AchievementOptions>,
     {
-        visibility: ProcessedComputable<Visibility>;
+        visibility: ProcessedComputable<Visibility | boolean>;
     }
 >;
 
 export function createAchievement<T extends AchievementOptions>(
     optionsFunc?: OptionsFunc<T, BaseAchievement, GenericAchievement>
 ): Achievement<T> {
-    const earned = persistent<boolean>(false);
+    const earned = persistent<boolean>(false, false);
     return createLazyProxy(() => {
         const achievement = optionsFunc?.() ?? ({} as ReturnType<NonNullable<typeof optionsFunc>>);
         achievement.id = getUniqueID("achievement-");
@@ -104,12 +105,12 @@ export function createAchievement<T extends AchievementOptions>(
                 if (settings.active !== player.id) return;
                 if (
                     !genericAchievement.earned.value &&
-                    unref(genericAchievement.visibility) === Visibility.Visible &&
+                    isVisible(genericAchievement.visibility) &&
                     genericAchievement.shouldEarn?.()
                 ) {
                     genericAchievement.earned.value = true;
                     genericAchievement.onComplete?.();
-                    if (genericAchievement.display) {
+                    if (genericAchievement.display != null) {
                         const Display = coerceComponent(unref(genericAchievement.display));
                         toast.info(
                             <div>

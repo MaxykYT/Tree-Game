@@ -13,6 +13,7 @@ import type {
 import { processComputable } from "util/computed";
 import { createLazyProxy } from "util/proxies";
 import { shallowReactive, unref } from "vue";
+import Hotkey from "components/Hotkey.vue";
 
 export const hotkeys: Record<string, GenericHotkey | undefined> = shallowReactive({});
 export const HotkeyType = Symbol("Hotkey");
@@ -42,6 +43,8 @@ export type GenericHotkey = Replace<
         enabled: ProcessedComputable<boolean>;
     }
 >;
+
+const uppercaseNumbers = [")", "!", "@", "#", "$", "%", "^", "&", "*", "("];
 
 export function createHotkey<T extends HotkeyOptions>(
     optionsFunc: OptionsFunc<T, BaseHotkey, GenericHotkey>
@@ -78,7 +81,9 @@ document.onkeydown = function (e) {
         return;
     }
     let key = e.key;
-    if (e.shiftKey) {
+    if (uppercaseNumbers.includes(key)) {
+        key = "shift+" + uppercaseNumbers.indexOf(key);
+    } else if (e.shiftKey) {
         key = "shift+" + key;
     }
     if (e.ctrlKey) {
@@ -101,11 +106,13 @@ registerInfoComponent(
             <div>
                 <br />
                 <h4>Hotkeys</h4>
-                {keys.map(hotkey => (
-                    <div>
-                        {hotkey?.key}: {hotkey?.description}
-                    </div>
-                ))}
+                <div style="column-count: 2">
+                    {keys.map(hotkey => (
+                        <div>
+                            <Hotkey hotkey={hotkey as GenericHotkey} /> {hotkey?.description}
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     })
