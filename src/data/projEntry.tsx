@@ -2,13 +2,10 @@ import Profectus from "components/Profectus.vue";
 import Spacer from "components/layout/Spacer.vue";
 import { jsx } from "features/feature";
 import { createResource, trackBest, trackOOMPS, trackTotal } from "features/resources/resource";
-import type { GenericTree } from "features/trees/tree";
-import { branchedResetPropagation, createTree } from "features/trees/tree";
 import { globalBus } from "game/events";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { setupLayerModal } from "game/layers";
 import { createLayer } from "game/layers";
-import type { PlayerData } from "game/player";
 import player from "game/player";
 import type { DecimalSource } from "util/bignum";
 import Decimal, { format, formatTime } from "util/bignum";
@@ -17,6 +14,8 @@ import { computed, toRaw } from "vue";
 import a from "./layers/aca/a";
 import c from "./layers/aca/c";
 import f from "./layers/aca/f";
+import { Player } from "game/player";
+import { createTree, GenericTree, branchedResetPropagation } from "features/trees/tree";
 
 /**
  * @hidden
@@ -71,10 +70,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
         display: jsx(() => (
             <>
                 {player.devSpeed === 0 ? <div>Game Paused</div> : null}
-                {player.devSpeed && player.devSpeed !== 1 ? (
+                {player.devSpeed != null && player.devSpeed != 0 && player.devSpeed !== 1 ? (
                     <div>Dev Speed: {format(player.devSpeed)}x</div>
                 ) : null}
-                {player.offlineTime ? (
+                {player.offlineTime != null && player.offlineTime != 0 ? (
                     <div>Offline Time: {formatTime(player.offlineTime)}</div>
                 ) : null}
                 <div>
@@ -105,7 +104,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
  */
 export const getInitialLayers = (
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-    player: Partial<PlayerData>
+    player: Partial<Player>
 ): Array<GenericLayer> => [main, f, c, a];
 
 /**
@@ -123,7 +122,7 @@ export const hasWon = computed(() => {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 export function fixOldSave(
     oldVersion: string | undefined,
-    player: Partial<PlayerData>
+    player: Partial<Player>
     // eslint-disable-next-line @typescript-eslint/no-empty-function
 ): void {}
 /* eslint-enable @typescript-eslint/no-unused-vars */
