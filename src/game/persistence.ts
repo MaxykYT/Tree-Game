@@ -9,6 +9,7 @@ import type { Ref, WritableComputedRef } from "vue";
 import { computed, isReactive, isRef, ref } from "vue";
 import player from "./player";
 import state from "./state";
+import Formula from "./formulas/formulas";
 
 /**
  * A symbol used in {@link Persistent} objects.
@@ -45,6 +46,11 @@ export const SaveDataPath = Symbol("SaveDataPath");
  * @see {@link Persistent[CheckNaN]}
  */
 export const CheckNaN = Symbol("CheckNaN");
+
+/**
+ * A symbol used to flag objects that should not be checked for persistent values.
+ */
+export const SkipPersistence = Symbol("SkipPersistence");
 
 /**
  * This is a union of things that should be safely stringifiable without needing special processes or knowing what to load them in as.
@@ -110,12 +116,7 @@ function checkNaNAndWrite<T extends State>(persistent: Persistent<T>, value: T) 
             state.NaNPath = persistent[SaveDataPath];
             state.NaNPersistent = persistent as Persistent<DecimalSource>;
         }
-        console.error(
-            `Attempted to save NaN value to`,
-            persistent[SaveDataPath]?.join("."),
-            persistent
-        );
-        throw new Error("Attempted to set NaN value. See above for details");
+        console.error(`Attempted to save NaN value to ${persistent[SaveDataPath]?.join(".")}`);
     }
     persistent[PersistentState].value = value;
 }
@@ -196,12 +197,42 @@ export function isPersistent(value: unknown): value is Persistent {
 
 /**
  * Unwraps the non-persistent ref inside of persistent refs, to be passed to other features without duplicating values in the save data object.
- * @param persistent The persistent ref to unwrap
+ * @param persistent The persistent ref to unwrap, or an object to ignore all persistent refs within
  */
 export function noPersist<T extends Persistent<S>, S extends State>(
     persistent: T
-): T[typeof NonPersistent] {
-    return persistent[NonPersistent];
+): T[typeof NonPersistent];
+export function noPersist<T extends object>(persistent: T): T;
+export function noPersist<T extends Persistent<S>, S extends State>(persistent: T | object) {
+    // Check for proxy state so if it's a lazy proxy we don't evaluate it's function
+    // Lazy proxies are not persistent refs themselves, so we know we want to wrap them
+    return !(ProxyState in persistent) && NonPersistent in persistent
+        ? persistent[NonPersistent]
+        : new Proxy(persistent, {
+              get(target, p) {
+                  if (p === PersistentState) {
+                      return undefined;
+                  }
+                  if (p === SkipPersistence) {
+                      return true;
+                  }
+                  return target[p as keyof typeof target];
+              },
+              set(target, key, value) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (target as Record<PropertyKey, any>)[key] = value;
+                  return true;
+              },
+              has(target, key) {
+                  if (key === PersistentState) {
+                      return false;
+                  }
+                  if (key == SkipPersistence) {
+                      return true;
+                  }
+                  return Reflect.has(target, key);
+              }
+          });
 }
 
 /**
@@ -226,6 +257,9 @@ globalBus.on("addLayer", (layer: GenericLayer, saveData: Record<string, unknown>
         Object.keys(obj).forEach(key => {
             let value = obj[key];
             if (value != null && typeof value === "object") {
+                if ((value as Record<PropertyKey, unknown>)[SkipPersistence] === true) {
+                    return;
+                }
                 if (ProxyState in value) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     value = (value as any)[ProxyState] as object;
@@ -253,8 +287,8 @@ globalBus.on("addLayer", (layer: GenericLayer, saveData: Record<string, unknown>
                                 "."
                             )}\` when it's already present at \`${value[SaveDataPath].join(
                                 "."
-                            )}\`. This can cause unexpected behavior when loading saves between updates.`,
-                            value
+                            )}\`.`,
+                            "This can cause unexpected behavior when loading saves between updates."
                         );
                     }
                     value[SaveDataPath] = newPath;
@@ -287,6 +321,7 @@ globalBus.on("addLayer", (layer: GenericLayer, saveData: Record<string, unknown>
                     }
                 } else if (
                     !(value instanceof Decimal) &&
+                    !(value instanceof Formula) &&
                     !isRef(value) &&
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     !features.includes(value as { type: typeof Symbol })
@@ -328,9 +363,9 @@ globalBus.on("addLayer", (layer: GenericLayer, saveData: Record<string, unknown>
             return;
         }
         console.error(
-            `Created persistent ref in ${layer.id} without registering it to the layer! Make sure to include everything persistent in the returned object`,
-            persistent,
-            "\nCreated at:\n" + persistent[StackTrace]
+            `Created persistent ref in ${layer.id} without registering it to the layer!`,
+            "Make sure to include everything persistent in the returned object.\n\nCreated at:\n" +
+                persistent[StackTrace]
         );
     });
     persistentRefs[layer.id].clear();

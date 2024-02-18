@@ -1,5 +1,5 @@
 import "components/common/modifiers.css";
-import type { CoercableComponent } from "features/feature";
+import type { CoercableComponent, OptionsFunc } from "features/feature";
 import { jsx } from "features/feature";
 import settings from "game/settings";
 import type { DecimalSource } from "util/bignum";
@@ -10,6 +10,8 @@ import { convertComputable } from "util/computed";
 import { createLazyProxy } from "util/proxies";
 import { renderJSX } from "util/vue";
 import { computed, unref } from "vue";
+import Formula from "./formulas/formulas";
+import { FormulaSource, GenericFormula } from "./formulas/types";
 
 /**
  * An object that can be used to apply or unapply some modification to a number.
@@ -21,7 +23,9 @@ export interface Modifier {
     /** Applies some operation on the input and returns the result. */
     apply: (gain: DecimalSource) => DecimalSource;
     /** Reverses the operation applied by the apply property. Required by some features. */
-    revert?: (gain: DecimalSource) => DecimalSource;
+    invert?: (gain: DecimalSource) => DecimalSource;
+    /** Get a formula for this modifier. Required by some features. */
+    getFormula?: (gain: FormulaSource) => GenericFormula;
     /**
      * Whether or not this modifier should be considered enabled.
      * Typically for use with modifiers passed into {@link createSequentialModifier}.
@@ -37,22 +41,22 @@ export interface Modifier {
 /**
  * Utility type used to narrow down a modifier type that will have a description and/or enabled property based on optional parameters, T and S (respectively).
  */
-export type ModifierFromOptionalParams<T, S> = T extends undefined
-    ? S extends undefined
-        ? Omit<WithRequired<Modifier, "revert">, "description" | "enabled">
-        : Omit<WithRequired<Modifier, "revert" | "enabled">, "description">
-    : S extends undefined
-    ? Omit<WithRequired<Modifier, "revert" | "description">, "enabled">
-    : WithRequired<Modifier, "revert" | "enabled" | "description">;
+export type ModifierFromOptionalParams<T, S> = undefined extends T
+    ? undefined extends S
+        ? Omit<WithRequired<Modifier, "invert" | "getFormula">, "description" | "enabled">
+        : Omit<WithRequired<Modifier, "invert" | "enabled" | "getFormula">, "description">
+    : undefined extends S
+    ? Omit<WithRequired<Modifier, "invert" | "description" | "getFormula">, "enabled">
+    : WithRequired<Modifier, "invert" | "enabled" | "description" | "getFormula">;
 
 /** An object that configures an additive modifier via {@link createAdditiveModifier}. */
 export interface AdditiveModifierOptions {
     /** The amount to add to the input value. */
     addend: Computable<DecimalSource>;
     /** Description of what this modifier is doing. */
-    description?: Computable<CoercableComponent> | undefined;
+    description?: Computable<CoercableComponent>;
     /** A computable that will be processed and passed directly into the returned modifier. */
-    enabled?: Computable<boolean> | undefined;
+    enabled?: Computable<boolean>;
     /** Determines if numbers larger or smaller than 0 should be displayed as red. */
     smallerIsBetter?: boolean;
 }
@@ -62,17 +66,21 @@ export interface AdditiveModifierOptions {
  * @param optionsFunc Additive modifier options.
  */
 export function createAdditiveModifier<T extends AdditiveModifierOptions>(
-    optionsFunc: () => T
+    optionsFunc: OptionsFunc<T>
 ): ModifierFromOptionalParams<T["description"], T["enabled"]> {
-    return createLazyProxy(() => {
-        const { addend, description, enabled, smallerIsBetter } = optionsFunc();
+    return createLazyProxy(feature => {
+        const { addend, description, enabled, smallerIsBetter } = optionsFunc.call(
+            feature,
+            feature
+        );
 
         const processedAddend = convertComputable(addend);
         const processedDescription = convertComputable(description);
         const processedEnabled = enabled == null ? undefined : convertComputable(enabled);
         return {
             apply: (gain: DecimalSource) => Decimal.add(gain, unref(processedAddend)),
-            revert: (gain: DecimalSource) => Decimal.sub(gain, unref(processedAddend)),
+            invert: (gain: DecimalSource) => Decimal.sub(gain, unref(processedAddend)),
+            getFormula: (gain: FormulaSource) => Formula.add(gain, processedAddend),
             enabled: processedEnabled,
             description:
                 description == null
@@ -123,17 +131,21 @@ export interface MultiplicativeModifierOptions {
  * @param optionsFunc Multiplicative modifier options.
  */
 export function createMultiplicativeModifier<T extends MultiplicativeModifierOptions>(
-    optionsFunc: () => T
+    optionsFunc: OptionsFunc<T>
 ): ModifierFromOptionalParams<T["description"], T["enabled"]> {
-    return createLazyProxy(() => {
-        const { multiplier, description, enabled, smallerIsBetter } = optionsFunc();
+    return createLazyProxy(feature => {
+        const { multiplier, description, enabled, smallerIsBetter } = optionsFunc.call(
+            feature,
+            feature
+        );
 
         const processedMultiplier = convertComputable(multiplier);
         const processedDescription = convertComputable(description);
         const processedEnabled = enabled == null ? undefined : convertComputable(enabled);
         return {
             apply: (gain: DecimalSource) => Decimal.times(gain, unref(processedMultiplier)),
-            revert: (gain: DecimalSource) => Decimal.div(gain, unref(processedMultiplier)),
+            invert: (gain: DecimalSource) => Decimal.div(gain, unref(processedMultiplier)),
+            getFormula: (gain: FormulaSource) => Formula.times(gain, processedMultiplier),
             enabled: processedEnabled,
             description:
                 description == null
@@ -185,11 +197,11 @@ export interface ExponentialModifierOptions {
  * @param optionsFunc Exponential modifier options.
  */
 export function createExponentialModifier<T extends ExponentialModifierOptions>(
-    optionsFunc: () => T
+    optionsFunc: OptionsFunc<T>
 ): ModifierFromOptionalParams<T["description"], T["enabled"]> {
-    return createLazyProxy(() => {
+    return createLazyProxy(feature => {
         const { exponent, description, enabled, supportLowNumbers, smallerIsBetter } =
-            optionsFunc();
+            optionsFunc.call(feature, feature);
 
         const processedExponent = convertComputable(exponent);
         const processedDescription = convertComputable(description);
@@ -206,7 +218,7 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
                 }
                 return result;
             },
-            revert: (gain: DecimalSource) => {
+            invert: (gain: DecimalSource) => {
                 let result = gain;
                 if (supportLowNumbers) {
                     result = Decimal.add(result, 1);
@@ -217,6 +229,10 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
                 }
                 return result;
             },
+            getFormula: (gain: FormulaSource) =>
+                supportLowNumbers
+                    ? Formula.add(gain, 1).pow(processedExponent).sub(1)
+                    : Formula.pow(gain, processedExponent),
             enabled: processedEnabled,
             description:
                 description == null
@@ -259,9 +275,9 @@ export function createExponentialModifier<T extends ExponentialModifierOptions>(
  */
 export function createSequentialModifier<
     T extends Modifier[],
-    S = T extends WithRequired<Modifier, "revert">[]
-        ? WithRequired<Modifier, "description" | "revert">
-        : Omit<WithRequired<Modifier, "description">, "revert">
+    S = T extends WithRequired<Modifier, "invert">[]
+        ? WithRequired<Modifier, "description" | "invert">
+        : Omit<WithRequired<Modifier, "description">, "invert">
 >(modifiersFunc: () => T): S {
     return createLazyProxy(() => {
         const modifiers = modifiersFunc();
@@ -271,24 +287,35 @@ export function createSequentialModifier<
                 modifiers
                     .filter(m => unref(m.enabled) !== false)
                     .reduce((gain, modifier) => modifier.apply(gain), gain),
-            revert: modifiers.every(m => m.revert != null)
+            invert: modifiers.every(m => m.invert != null)
                 ? (gain: DecimalSource) =>
                       modifiers
                           .filter(m => unref(m.enabled) !== false)
                           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                          .reduceRight((gain, modifier) => modifier.revert!(gain), gain)
+                          .reduceRight((gain, modifier) => modifier.invert!(gain), gain)
                 : undefined,
-            enabled: computed(() => modifiers.filter(m => unref(m.enabled) !== false).length > 0),
-            description: jsx(() => (
-                <>
-                    {(
-                        modifiers
-                            .filter(m => unref(m.enabled) !== false)
-                            .map(m => unref(m.description))
-                            .filter(d => d) as CoercableComponent[]
-                    ).map(renderJSX)}
-                </>
-            ))
+            getFormula: modifiers.every(m => m.getFormula != null)
+                ? (gain: FormulaSource) =>
+                      modifiers
+                          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                          .reduce((acc, curr) => Formula.if(acc, curr.enabled ?? true,
+                            acc => curr.getFormula!(acc), acc => acc), gain)
+                : undefined,
+            enabled: modifiers.some(m => m.enabled != null)
+                ? computed(() => modifiers.filter(m => unref(m.enabled) !== false).length > 0)
+                : undefined,
+            description: modifiers.some(m => m.description != null)
+                ? jsx(() => (
+                      <>
+                          {(
+                              modifiers
+                                  .filter(m => unref(m.enabled) !== false)
+                                  .map(m => unref(m.description))
+                                  .filter(d => d) as CoercableComponent[]
+                          ).map(renderJSX)}
+                      </>
+                  ))
+                : undefined
         };
     }) as unknown as S;
 }

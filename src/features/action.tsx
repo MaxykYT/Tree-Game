@@ -31,27 +31,48 @@ import { coerceComponent, isCoercableComponent, render } from "util/vue";
 import { computed, Ref, ref, unref } from "vue";
 import { BarOptions, createBar, GenericBar } from "./bars/bar";
 import { ClickableOptions } from "./clickables/clickable";
+import { Decorator, GenericDecorator } from "./decorators/common";
 
+/** A symbol used to identify {@link Action} features. */
 export const ActionType = Symbol("Action");
 
+/**
+ * An object that configures an {@link Action}.
+ */
 export interface ActionOptions extends Omit<ClickableOptions, "onClick" | "onHold"> {
+    /** The cooldown during which the action cannot be performed again, in seconds. */
     duration: Computable<DecimalSource>;
+    /** Whether or not the action should perform automatically when the cooldown is finished. */
     autoStart?: Computable<boolean>;
+    /** A function that is called when the action is clicked. */
     onClick: (amount: DecimalSource) => void;
+    /** A pass-through to the {@link Bar} used to display the cooldown progress for the action. */
     barOptions?: Partial<BarOptions>;
 }
 
+/**
+ * The properties that are added onto a processed {@link ActionOptions} to create an {@link Action}.
+ */
 export interface BaseAction {
+    /** An auto-generated ID for identifying features that appear in the DOM. Will not persist between refreshes or updates. */
     id: string;
+    /** A symbol that helps identify features of the same type. */
     type: typeof ActionType;
+    /** Whether or not the player is holding down the action. Actions will be considered clicked as soon as the cooldown completes when being held down. */
     isHolding: Ref<boolean>;
+    /** The current amount of progress through the cooldown. */
     progress: Ref<DecimalSource>;
+    /** The bar used to display the current cooldown progress. */
     progressBar: GenericBar;
+    /** Update the cooldown the specified number of seconds */
     update: (diff: number) => void;
+    /** The Vue component used to render this feature. */
     [Component]: GenericComponent;
+    /** A function to gather the props the vue component requires for this feature. */
     [GatherProps]: () => Record<string, unknown>;
 }
 
+/** An object that represents a feature that can be clicked upon, and then has a cooldown before it can be clicked again. */
 export type Action<T extends ActionOptions> = Replace<
     T & BaseAction,
     {
@@ -67,6 +88,7 @@ export type Action<T extends ActionOptions> = Replace<
     }
 >;
 
+/** A type that matches any valid {@link Action} object. */
 export type GenericAction = Replace<
     Action<ActionOptions>,
     {
@@ -76,12 +98,23 @@ export type GenericAction = Replace<
     }
 >;
 
+/**
+ * Lazily creates an action with the given options.
+ * @param optionsFunc Action options.
+ */
 export function createAction<T extends ActionOptions>(
-    optionsFunc?: OptionsFunc<T, BaseAction, GenericAction>
+    optionsFunc?: OptionsFunc<T, BaseAction, GenericAction>,
+    ...decorators: GenericDecorator[]
 ): Action<T> {
     const progress = persistent<DecimalSource>(0);
-    return createLazyProxy(() => {
-        const action = optionsFunc?.() ?? ({} as ReturnType<NonNullable<typeof optionsFunc>>);
+    const decoratedData = decorators.reduce(
+        (current, next) => Object.assign(current, next.getPersistentData?.()),
+        {}
+    );
+    return createLazyProxy(feature => {
+        const action =
+            optionsFunc?.call(feature, feature) ??
+            ({} as ReturnType<NonNullable<typeof optionsFunc>>);
         action.id = getUniqueID("action-");
         action.type = ActionType;
         action[Component] = ClickableComponent as GenericComponent;
@@ -89,8 +122,13 @@ export function createAction<T extends ActionOptions>(
         // Required because of display changing types
         const genericAction = action as unknown as GenericAction;
 
+        for (const decorator of decorators) {
+            decorator.preConstruct?.(action);
+        }
+
         action.isHolding = ref(false);
         action.progress = progress;
+        Object.assign(action, decoratedData);
 
         processComputable(action as T, "visibility");
         setDefault(action, "visibility", Visibility.Visible);
@@ -131,7 +169,6 @@ export function createAction<T extends ActionOptions>(
             direction: Direction.Right,
             width: 100,
             height: 10,
-            style: "margin-top: 8px",
             borderStyle: "border-color: black",
             baseStyle: "margin-top: -1px",
             progress: () => Decimal.div(progress.value, unref(genericAction.duration)),
@@ -202,6 +239,14 @@ export function createAction<T extends ActionOptions>(
             }
         };
 
+        for (const decorator of decorators) {
+            decorator.postConstruct?.(action);
+        }
+
+        const decoratedProps = decorators.reduce(
+            (current, next) => Object.assign(current, next.getGatheredProps?.(action)),
+            {}
+        );
         action[GatherProps] = function (this: GenericAction) {
             const {
                 display,
@@ -225,7 +270,8 @@ export function createAction<T extends ActionOptions>(
                 canClick,
                 small,
                 mark,
-                id
+                id,
+                ...decoratedProps
             };
         };
 

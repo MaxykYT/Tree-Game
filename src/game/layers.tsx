@@ -220,12 +220,14 @@ export function createLayer<T extends LayerOptions>(
         addingLayers.push(id);
         persistentRefs[id] = new Set();
         layer.minimized = persistent(false, false);
-        Object.assign(layer, optionsFunc.call(layer as BaseLayer));
+        Object.assign(layer, optionsFunc.call(layer, layer as BaseLayer));
         if (
             addingLayers[addingLayers.length - 1] == null ||
             addingLayers[addingLayers.length - 1] !== id
         ) {
-            throw `Adding layers stack in invalid state. This should not happen\nStack: ${addingLayers}\nTrying to pop ${layer.id}`;
+            throw new Error(
+                `Adding layers stack in invalid state. This should not happen\nStack: ${addingLayers}\nTrying to pop ${layer.id}`
+            );
         }
         addingLayers.pop();
 

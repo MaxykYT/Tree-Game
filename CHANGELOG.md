@@ -6,17 +6,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2023-05-17
+### Added
+- Error boundaries around each layer, and errors now display on the page when in development
+- Utility for creating requirement based on whether a conversion has met a requirement
+### Changed 
+- **BREAKING** Formulas/requirements refactor
+    - spendResources renamed to cumulativeCost
+    - summedPurchases renamed to directSum
+    - calculateMaxAffordable now takes optional 'maxBulkAmount' parameter
+    - cost requirements now pass cumulativeCost, maxBulkAmount, and directSum to calculateMaxAffordable
+    - Non-integrable and non-invertible formulas will now work in more situations
+    - Repeatable.maximize is removed
+    - Challenge.maximize is removed
+- Formulas have better typing information now
+- Integrate functions now log errors if the variable input is not integrable
+- Cyclical proxies now throw errors
+- createFormulaPreview is now a JSX function
+- Tree nodes are not automatically capitalized anymore
+- upgrade.canPurchase now returns false if the upgrade is already bought
+- TPS display is simplified and more performant now
+### Fixed
+- Actions could not be constructed
+- Progress bar on actions was misaligned
+- Many different issues the Board features (and many changes/improvements)
+- Calculating max affordable could sometimes infinite loop
+- Non-integrable formulas could cause errors in cost requirements
+- estimateTime would not show "never" when production is 0
+- isInvertible and isIntegrable now properly handle nested formulas
+- Repeatables' amount display would show the literal text "joinJSX"
+- Repeatables would not buy max properly
+- Reset buttons were showing wrong "currentAt" vs "nextAt"
+- Step-wise formulas not updating their value correctly
+- Bonus amount decorator now checks for `amount` property in the post construct callback
+### Documentation
+- Various typos fixed and a few sections made more thorough
+
+## [0.6.0] - 2023-04-20
 ### Added
 - **BREAKING** New requirements system
     - Replaces many features' existing requirements with new generic form
-- Formulas, which can be used to calculate buy max for you
-- Action feature
-- ETA util
-- createCollapsibleMilestones util
+- **BREAKING** Formulas, which can be used to calculate buy max for you
+    - Requirements can use them so repeatables and challenges can be "buy max" without any extra effort
+    - Conversions now use formulas instead of the old scaling functions system, allowing for arbitrary functions that are much easier to follow
+    - Modifiers have a new getFormula property
+- Feature decorators, which simplify the process of adding extra values to features
+- Action feature, which is a clickable with a cooldown
+- ETA util (calculates time until a specific amount of a resource, based on its current gain rate)
+- createCollapsibleAchievements util
 - deleteLowerSaves util
 - Minimized layers can now display a component
 - submitOnBlur property to Text fields
-- showPopups property to Milestones
+- showPopups property to achievements
 - Mouse/touch events to more onClick listeners
 - Example hotkey to starting layer
 - Schema for projInfo.json
@@ -29,12 +70,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Requires referencing persistent refs either through a proxy or by wrapping in `noPersist()`
 - **BREAKING** Visibility properties can now take booleans
     - Removed showIf util
+- **BREAKING** Lazy proxies and options functions now pass the base object in as `this` as well as the first parameter.
 - Tweaked settings display
 - setupPassiveGeneration will no longer lower the resource
 - displayResource now floors resource amounts
 - Tweaked modifier displays, incl showing negative modifiers in red
 - Hotkeys now appear on key graphic
 - Mofifier sections now accept computable strings for title and subtitle
+- Every VueFeature's `[Component]` property is now typed as GenericComponent
+- Make errors throw objects instead of strings
 - Updated b_e
 ### Fixed
 - NaN detection stopped working
@@ -54,15 +98,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tabs could sometimes not update correctly
 - offlineTime not capping properly
 - Tooltips being user-selectable
+- Pinnable tooltips causing stack overflow
 - Workflows not working with submodules
 - Various minor typing issues
+### Removed
+- **BREAKING** Removed milestones (achievements now have small and large displays)
 ### Documented
-- requirements.tsx
-- formulas.tsx
-- repeatables.tsx
-### Tests
-- requirements
+- every single feature
 - formulas
+- requirements
+### Tests
+- conversions
+- formulas
+- modifiers
+- requirements
 
 Contributors: thepaperpilot, escapee, adsaf, ducdat
 

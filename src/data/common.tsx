@@ -5,11 +5,11 @@ import { createClickable } from "features/clickables/clickable";
 import type { GenericConversion } from "features/conversion";
 import type { CoercableComponent, JSXFunction, OptionsFunc, Replace } from "features/feature";
 import { jsx, setDefault } from "features/feature";
-import { displayResource, Resource } from "features/resources/resource";
+import { Resource, displayResource } from "features/resources/resource";
 import type { GenericTree, GenericTreeNode, TreeNode, TreeNodeOptions } from "features/trees/tree";
 import { createTreeNode } from "features/trees/tree";
-import Formula from "game/formulas/formulas";
-import type { FormulaSource, GenericFormula } from "game/formulas/types";
+import type { GenericFormula } from "game/formulas/types";
+import { BaseLayer } from "game/layers";
 import type { Modifier } from "game/modifiers";
 import type { Persistent } from "game/persistence";
 import { DefaultValue, persistent } from "game/persistence";
@@ -17,7 +17,7 @@ import player from "game/player";
 import settings from "game/settings";
 import type { DecimalSource } from "util/bignum";
 import Decimal, { format, formatSmall, formatTime } from "util/bignum";
-import type { WithRequired } from "util/common";
+import { WithRequired, camelToTitle } from "util/common";
 import type {
     Computable,
     GetComputableType,
@@ -99,8 +99,8 @@ export type GenericResetButton = Replace<
 export function createResetButton<T extends ClickableOptions & ResetButtonOptions>(
     optionsFunc: OptionsFunc<T>
 ): ResetButton<T> {
-    return createClickable(() => {
-        const resetButton = optionsFunc();
+    return createClickable(feature => {
+        const resetButton = optionsFunc.call(feature, feature);
 
         processComputable(resetButton as T, "showNextAt");
         setDefault(resetButton, "showNextAt", true);
@@ -134,10 +134,10 @@ export function createResetButton<T extends ClickableOptions & ResetButtonOption
                             {unref(resetButton.conversion.buyMax) ? "Next:" : "Req:"}{" "}
                             {displayResource(
                                 resetButton.conversion.baseResource,
-                                unref(resetButton.conversion.buyMax) ||
-                                    Decimal.floor(unref(resetButton.conversion.actualGain)).neq(1)
-                                    ? unref(resetButton.conversion.nextAt)
-                                    : unref(resetButton.conversion.currentAt)
+                                !unref(resetButton.conversion.buyMax) &&
+                                    Decimal.gte(unref(resetButton.conversion.actualGain), 1)
+                                    ? unref(resetButton.conversion.currentAt)
+                                    : unref(resetButton.conversion.nextAt)
                             )}{" "}
                             {resetButton.conversion.baseResource.displayName}
                         </div>
@@ -178,11 +178,6 @@ export interface LayerTreeNodeOptions extends TreeNodeOptions {
     layerID: string;
     /** The color to display this tree node as */
     color: Computable<string>; // marking as required
-    /**
-     * The content to display in the tree node.
-     * Defaults to the layer's ID
-     */
-    display?: Computable<CoercableComponent>;
     /** Whether or not to append the layer to the tabs list.
      * If set to false, then the tree node will instead always remove all tabs to its right and then add the layer tab.
      * Defaults to true.
@@ -213,14 +208,12 @@ export type GenericLayerTreeNode = Replace<
 export function createLayerTreeNode<T extends LayerTreeNodeOptions>(
     optionsFunc: OptionsFunc<T>
 ): LayerTreeNode<T> {
-    return createTreeNode(() => {
-        const options = optionsFunc();
-        processComputable(options as T, "display");
-        setDefault(options, "display", options.layerID);
+    return createTreeNode(feature => {
+        const options = optionsFunc.call(feature, feature);
+        setDefault(options, "display", camelToTitle(options.layerID));
         processComputable(options as T, "append");
         return {
             ...options,
-            display: options.display,
             onClick: unref((options as unknown as GenericLayerTreeNode).append)
                 ? function () {
                       if (player.tabs.includes(options.layerID)) {
@@ -253,17 +246,17 @@ export interface Section {
     baseText?: Computable<CoercableComponent>;
     /** Whether or not this section should be currently visible to the player. **/
     visible?: Computable<boolean>;
+    /** Determines if numbers larger or smaller than the base should be displayed as red. */
+    smallerIsBetter?: boolean;
 }
 
 /**
  * Takes an array of modifier "sections", and creates a JSXFunction that can render all those sections, and allow each section to be collapsed.
  * Also returns a list of persistent refs that are used to control which sections are currently collapsed.
  * @param sectionsFunc A function that returns the sections to display.
- * @param smallerIsBetter Determines whether numbers larger or smaller than the base should be displayed as red.
  */
 export function createCollapsibleModifierSections(
-    sectionsFunc: () => Section[],
-    smallerIsBetter = false
+    sectionsFunc: () => Section[]
 ): [JSXFunction, Persistent<Record<number, boolean>>] {
     const sections: Section[] = [];
     const processed:
@@ -324,7 +317,9 @@ export function createCollapsibleModifierSections(
                             {s.unit}
                         </span>
                     </div>
-                    {renderJSX(unref(s.modifier.description))}
+                    {s.modifier.description == null
+                        ? null
+                        : renderJSX(unref(s.modifier.description))}
                 </>
             );
 
@@ -353,7 +348,7 @@ export function createCollapsibleModifierSections(
                                 class="modifier-amount"
                                 style={
                                     (
-                                        smallerIsBetter === true
+                                        s.smallerIsBetter === true
                                             ? Decimal.gt(total, base ?? 1)
                                             : Decimal.lt(total, base ?? 1)
                                     )
@@ -443,7 +438,7 @@ export function estimateTime(
         const currTarget = unref(processedTarget);
         if (Decimal.gte(resource.value, currTarget)) {
             return "Now";
-        } else if (Decimal.lt(currRate, 0)) {
+        } else if (Decimal.lte(currRate, 0)) {
             return "Never";
         }
         return formatTime(Decimal.sub(currTarget, resource.value).div(currRate));
@@ -461,13 +456,13 @@ export function createFormulaPreview(
     formula: GenericFormula,
     showPreview: Computable<boolean>,
     previewAmount: Computable<DecimalSource> = 1
-): ComputedRef<CoercableComponent> {
+) {
     const processedShowPreview = convertComputable(showPreview);
     const processedPreviewAmount = convertComputable(previewAmount);
     if (!formula.hasVariable()) {
-        throw new Error("Cannot create formula preview if the formula does not have a variable");
+        console.error("Cannot create formula preview if the formula does not have a variable");
     }
-    return computed(() => {
+    return jsx(() => {
         if (unref(processedShowPreview)) {
             const curr = formatSmall(formula.evaluate());
             const preview = formatSmall(
@@ -478,37 +473,35 @@ export function createFormulaPreview(
                     )
                 )
             );
-            return jsx(() => (
+            return (
                 <>
                     <b>
                         <i>
-                            {curr}→{preview}
+                            {curr} → {preview}
                         </i>
                     </b>
                 </>
-            ));
+            );
         }
-        return formatSmall(formula.evaluate());
+        return <>{formatSmall(formula.evaluate())}</>;
     });
 }
 
-export function modifierToFormula<T extends GenericFormula>(
-    modifier: WithRequired<Modifier, "revert">,
-    base: T
-): T;
-export function modifierToFormula(modifier: Modifier, base: FormulaSource): GenericFormula;
-export function modifierToFormula(modifier: Modifier, base: FormulaSource) {
-    return new Formula({
-        inputs: [base],
-        evaluate: val => modifier.apply(val),
-        invert:
-            "revert" in modifier && modifier.revert != null
-                ? (val, lhs) => {
-                      if (lhs instanceof Formula && lhs.hasVariable()) {
-                          return lhs.invert(modifier.revert!(val));
-                      }
-                      throw new Error("Could not invert due to no input being a variable");
-                  }
-                : undefined
-    });
+/**
+ * Utility function for getting a computed boolean for whether or not a given feature is currently rendered in the DOM.
+ * Note it will have a true value even if the feature is off screen.
+ * @param layer The layer the feature appears within
+ * @param id The ID of the feature
+ */
+export function isRendered(layer: BaseLayer, id: string): ComputedRef<boolean>;
+/**
+ * Utility function for getting a computed boolean for whether or not a given feature is currently rendered in the DOM.
+ * Note it will have a true value even if the feature is off screen.
+ * @param layer The layer the feature appears within
+ * @param feature The feature that may be rendered
+ */
+export function isRendered(layer: BaseLayer, feature: { id: string }): ComputedRef<boolean>;
+export function isRendered(layer: BaseLayer, idOrFeature: string | { id: string }) {
+    const id = typeof idOrFeature === "string" ? idOrFeature : idOrFeature.id;
+    return computed(() => id in layer.nodes.value);
 }
